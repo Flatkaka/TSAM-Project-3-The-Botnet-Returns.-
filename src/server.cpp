@@ -153,17 +153,9 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
 // Process command from client on the server
 
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, 
-                  char *buffer) 
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens) 
 {
-  std::vector<std::string> tokens;
-  std::string token;
 
-  // Split command from client into tokens for parsing
-  std::stringstream stream(buffer);
-
-  while(stream >> token)
-      tokens.push_back(token);
 
   if((tokens[0].compare("CONNECT") == 0) && (tokens.size() == 2))
   {
@@ -192,6 +184,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
      send(clientSocket, msg.c_str(), msg.length()-1, 0);
 
   }
+
   // This is slightly fragile, since it's relying on the order
   // of evaluation of the if statement.
   else if((tokens[0].compare("MSG") == 0) && (tokens[1].compare("ALL") == 0))
@@ -224,10 +217,69 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
   }
   else
   {
-      std::cout << "Unknown command from client:" << buffer << std::endl;
+      std::cout << "Unknown command from client:" << tokens[0] << std::endl;
   }
      
 }
+
+void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens){
+  
+
+    if((tokens[1].compare("QUERYSERVERS") == 0) && (tokens.size() == 3))
+    {
+        std::cout << tokens[1]<<tokens[2]<<std::endl;
+    }
+    else if(tokens[1].compare("CONNECTED") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<tokens[3]<<tokens[4]<<std::endl;
+    }
+    else if(tokens[1].compare("KEEPALIVE") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<std::endl;
+    }
+    else if(tokens[1].compare("GET_MSG") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<std::endl;
+    }
+    else if(tokens[1].compare("SEND_MSG") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<tokens[3]<<std::endl;
+    }
+    else if(tokens[1].compare("LEAVE") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<tokens[3]<<std::endl;
+    }
+    else if(tokens[1].compare("STATUSREQ") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<std::endl;
+    }
+    else if(tokens[1].compare("STATUSRESP") == 0)
+    {
+        std::cout << tokens[1]<<tokens[2]<<tokens[3]<<std::endl;
+    }
+    else
+    {
+        std::cout << "Unknown command from client:" << tokens[0] << std::endl;
+    }
+      
+}
+
+
+std::vector<std::string> get_message(char *buffer) 
+{
+  std::vector<std::string> tokens;
+  std::string token;
+
+  // Split command from client into tokens for parsing
+  std::stringstream stream(buffer);
+
+    while(std::getline(stream, token, ',')){
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -326,9 +378,17 @@ int main(int argc, char* argv[])
                       // only triggers if there is something on the socket for us.
                       else
                       {
+                          
+                          std::vector<std::string> tokens = get_message(buffer);
                           std::cout << buffer << std::endl;
-                          clientCommand(client->sock, &openSockets, &maxfds, 
-                                        buffer);
+                          if (tokens[0].compare("*") == 0){
+                            serverCommand(client->sock, &openSockets, &maxfds, tokens);
+
+                          }
+                          else{
+                            clientCommand(client->sock, &openSockets, &maxfds, tokens);
+
+                          }
                       }
                   }
                }
