@@ -23,8 +23,16 @@
 
 #include <sys/un.h>
 #include <iomanip>
-
 #include <fcntl.h>
+
+
+#include <stdlib.h>
+
+
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <errno.h>
+
 
 #include <iostream>
 #include <sstream>
@@ -40,6 +48,71 @@
 #endif
 
 #define BACKLOG 5 // Allowed length of queue of waiting connections
+
+
+
+std::string getIP()
+{
+    struct ifaddrs *myaddrs, *ifa;
+    void *in_addr;
+    char buf[64];
+
+    if(getifaddrs(&myaddrs) != 0)
+    {
+        perror("getifaddrs");
+        exit(1);
+    }
+
+    for (ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr == NULL)
+            continue;
+        if (!(ifa->ifa_flags & IFF_UP))
+            continue;
+
+        switch (ifa->ifa_addr->sa_family)
+        {
+            case AF_INET:
+            {
+                struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
+                in_addr = &s4->sin_addr;
+                break;
+            }
+
+            case AF_INET6:
+            {
+                struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+                in_addr = &s6->sin6_addr;
+                break;
+            }
+
+            default:
+                continue;
+        }
+        std::string name = ifa->ifa_name;
+        if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
+        {
+            printf("%s: inet_ntop failed!\n", ifa->ifa_name);
+        }
+        else if (name.compare("eno16780032")==0)
+        {
+
+            std::string str (buf);
+            return str;
+        }
+        else if (name.compare("enp0s3")==0)
+        {
+
+            std::string str (buf);
+            return str;
+        }
+        
+    }
+
+    freeifaddrs(myaddrs);
+    return (std::string) "0";
+}
+
 
 // Simple class for handling connections from clients.
 //
@@ -63,7 +136,8 @@ public:
 // (indexed on socket no.) sacrificing memory for speed.
 
 std::map<int, Client *> clients; // Lookup table for per Client information
-
+std::string server_addr = getIP();
+std::string port_addr;
 // Open socket for specified port.
 //
 // Returns -1 if unable to create the socket for any reason.
@@ -175,9 +249,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         // Close the socket, and leave the socket handling
         // code to deal with tidying up clients etc. when
         // select() detects the OS has torn down the connection.
-        std::cout << "here before" << std::endl;
+        
         closeClient(clientSocket, openSockets, maxfds);
-        std::cout << "here after" << std::endl;
+        
     }
     else if (tokens[0].compare("WHO") == 0)
     {
@@ -231,38 +305,51 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
 
 void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
 {
+    std::cout<<tokens[0]<<std::endl;
 
-    if ((tokens[1].compare("QUERYSERVERS") == 0) && (tokens.size() == 3))
+    if ((tokens[0].compare("QUERYSERVERS") == 0))
+    {
+
+        for (auto const &pair : clients)
+        {
+            if (pair.second->name.compare(tokens[1]) == 0)
+            {
+                std::cout<<"name already occupied"<<std::endl;
+                break;
+            }
+        }
+        //todo: add the groupid and ipaddr. and portnr.
+        std::string msg = "*CONNECTED,1,"+server_addr+ ',' +port_addr+"#";
+        
+        send(clientSocket, msg.c_str(), msg.length(), 0);
+    }
+    else if (tokens[0].compare("CONNECTED") == 0)
+    {
+        std::cout << tokens[0] << tokens[1] << tokens[2] << tokens[3] << std::endl;
+    }
+    else if (tokens[0].compare("KEEPALIVE") == 0)
     {
         std::cout << tokens[1] << tokens[2] << std::endl;
     }
-    else if (tokens[1].compare("CONNECTED") == 0)
+    else if (tokens[0].compare("GET_MSG") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << tokens[4] << std::endl;
+        std::cout << tokens[0] << tokens[1] << std::endl;
     }
-    else if (tokens[1].compare("KEEPALIVE") == 0)
+    else if (tokens[0].compare("SEND_MSG") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
     }
-    else if (tokens[1].compare("GET_MSG") == 0)
+    else if (tokens[0].compare("LEAVE") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
     }
-    else if (tokens[1].compare("SEND_MSG") == 0)
+    else if (tokens[0].compare("STATUSREQ") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        std::cout << tokens[0] << tokens[1] << std::endl;
     }
-    else if (tokens[1].compare("LEAVE") == 0)
+    else if (tokens[0].compare("STATUSRESP") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
-    }
-    else if (tokens[1].compare("STATUSREQ") == 0)
-    {
-        std::cout << tokens[1] << tokens[2] << std::endl;
-    }
-    else if (tokens[1].compare("STATUSRESP") == 0)
-    {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
     }
     else
     {
@@ -300,7 +387,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in client;
     socklen_t clientLen;
     char buffer[1025]; // buffer for reading from clients
-
+    port_addr = argv[1];
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -425,9 +512,13 @@ int main(int argc, char *argv[])
                         {
 
                             std::vector<std::string> tokens = get_message(buffer);
-
-                            if (tokens[0].compare("*") == 0)
+                            std::string fw = tokens[0];
+                            tokens[0]=fw.substr(1);
+                            
+                            char fl = fw[0];
+                            if ( fl == '*' )
                             {
+
                                 serverCommand(client->sock, &openSockets, &maxfds, tokens);
                             }
                             else
