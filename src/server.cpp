@@ -132,30 +132,44 @@ int open_socket(int portno)
 void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 {
      // Remove client from the clients list
-     clients.erase(clientSocket);
+    clients.erase(clientSocket);
 
-     // If this client's socket is maxfds then the next lowest
-     // one has to be determined. Socket fd's can be reused by the Kernel,
-     // so there aren't any nice ways to do this.
+    // If this client's socket is maxfds then the next lowest
+    // one has to be determined. Socket fd's can be reused by the Kernel,
+    // so there aren't any nice ways to do this.
 
-     if(*maxfds == clientSocket)
-     {
+    if(*maxfds == clientSocket)
+    {
+
+ 
+            
+        *maxfds = 0;
+
         for(auto const& p : clients)
         {
             *maxfds = std::max(*maxfds, p.second->sock);
         }
-     }
 
-     // And remove from the list of open sockets.
+    }
 
-     FD_CLR(clientSocket, openSockets);
+    // And remove from the list of open sockets.
+
+    FD_CLR(clientSocket, openSockets);
 }
 
 // Process command from client on the server
 
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens) 
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer) 
 {
+  std::vector<std::string> tokens;
+  std::string token;
 
+  // Split command from client into tokens for parsing
+  std::stringstream stream(buffer);
+
+  while(stream >> token){
+    tokens.push_back(token);
+  }
 
   if((tokens[0].compare("CONNECT") == 0) && (tokens.size() == 2))
   {
@@ -166,8 +180,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
       // Close the socket, and leave the socket handling
       // code to deal with tidying up clients etc. when
       // select() detects the OS has torn down the connection.
- 
-      closeClient(clientSocket, openSockets, maxfds);
+    std::cout<<"here before"<<std::endl;
+    closeClient(clientSocket, openSockets, maxfds);
+    std::cout<<"here after"<<std::endl;
   }
   else if(tokens[0].compare("WHO") == 0)
   {
@@ -223,7 +238,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
 }
 
 void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens){
-  
 
     if((tokens[1].compare("QUERYSERVERS") == 0) && (tokens.size() == 3))
     {
@@ -259,7 +273,7 @@ void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else
     {
-        std::cout << "Unknown command from client:" << tokens[0] << std::endl;
+        std::cout << "Unknown command from server:" << tokens[0] << std::endl;
     }
       
 }
@@ -322,6 +336,7 @@ int main(int argc, char* argv[])
 
     while(!finished)
     {
+        std::cout<<"here1"<<std::endl;
         // Get modifiable copy of readSockets
         readSockets = exceptSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
@@ -339,6 +354,7 @@ int main(int argc, char* argv[])
             // First, accept  any new connections to the server on the listening socket
             if(FD_ISSET(listenSock, &readSockets))
             {
+               std::cout<<"here accept"<<std::endl;
                clientSock = accept(listenSock, (struct sockaddr *)&client,
                                    &clientLen);
                printf("accept***\n");
@@ -359,13 +375,18 @@ int main(int argc, char* argv[])
             // Now check for commands from clients
             while(n-- > 0)
             {
+
+
                for(auto const& pair : clients)
                {
+                  std::cout<<"here10"<<std::endl;
+                  std::cout<<pair.second<<std::endl;
                   Client *client = pair.second;
-
+                  std::cout<<client->sock<<std::endl;
                   if(FD_ISSET(client->sock, &readSockets))
                   {
                       // recv() == 0 means client has closed connection
+                       std::cout<<"here 20"<<std::endl;
                       if(recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
                       {
                           printf("Client closed connection: %d", client->sock);
@@ -378,7 +399,7 @@ int main(int argc, char* argv[])
                       // only triggers if there is something on the socket for us.
                       else
                       {
-                          
+
                           std::vector<std::string> tokens = get_message(buffer);
                           std::cout << buffer << std::endl;
                           if (tokens[0].compare("*") == 0){
@@ -386,10 +407,14 @@ int main(int argc, char* argv[])
 
                           }
                           else{
-                            clientCommand(client->sock, &openSockets, &maxfds, tokens);
+                            clientCommand(client->sock, &openSockets, &maxfds, buffer);
 
                           }
+                          std::cout<<"here4"<<std::endl;
+                          std::cout<<n<<std::endl;
+                          std::cout<<finished<<std::endl;
                       }
+                      break;
                   }
                }
             }
