@@ -21,6 +21,11 @@
 #include <map>
 #include <vector>
 
+#include <sys/un.h>
+#include <iomanip>
+
+#include <fcntl.h>
+
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -132,6 +137,9 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
     if (*maxfds == clientSocket)
     {
+
+        *maxfds = 0;
+
         for (auto const &p : clients)
         {
             *maxfds = std::max(*maxfds, p.second->sock);
@@ -145,8 +153,7 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
 // Process command from client on the server
 
-void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
-                   char *buffer)
+void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer)
 {
     std::vector<std::string> tokens;
     std::string token;
@@ -155,7 +162,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
     std::stringstream stream(buffer);
 
     while (stream >> token)
+    {
         tokens.push_back(token);
+    }
 
     if ((tokens[0].compare("CONNECT") == 0) && (tokens.size() == 2))
     {
@@ -166,8 +175,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
         // Close the socket, and leave the socket handling
         // code to deal with tidying up clients etc. when
         // select() detects the OS has torn down the connection.
-
+        std::cout << "here before" << std::endl;
         closeClient(clientSocket, openSockets, maxfds);
+        std::cout << "here after" << std::endl;
     }
     else if (tokens[0].compare("WHO") == 0)
     {
@@ -182,6 +192,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
         // granted is totally cheating.
         send(clientSocket, msg.c_str(), msg.length() - 1, 0);
     }
+
     // This is slightly fragile, since it's relying on the order
     // of evaluation of the if statement.
     else if ((tokens[0].compare("MSG") == 0) && (tokens[1].compare("ALL") == 0))
@@ -214,84 +225,66 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
     }
     else
     {
-        std::cout << "Unknown command from client:" << buffer << std::endl;
+        std::cout << "Unknown command from client:" << tokens[0] << std::endl;
     }
 }
 
-// // Process command from client on the server
+void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
+{
 
-// void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
-//                    char *buffer)
-// {
-//     std::vector<std::string> tokens;
-//     std::string token;
+    if ((tokens[1].compare("QUERYSERVERS") == 0) && (tokens.size() == 3))
+    {
+        std::cout << tokens[1] << tokens[2] << std::endl;
+    }
+    else if (tokens[1].compare("CONNECTED") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << tokens[3] << tokens[4] << std::endl;
+    }
+    else if (tokens[1].compare("KEEPALIVE") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << std::endl;
+    }
+    else if (tokens[1].compare("GET_MSG") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << std::endl;
+    }
+    else if (tokens[1].compare("SEND_MSG") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+    }
+    else if (tokens[1].compare("LEAVE") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+    }
+    else if (tokens[1].compare("STATUSREQ") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << std::endl;
+    }
+    else if (tokens[1].compare("STATUSRESP") == 0)
+    {
+        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+    }
+    else
+    {
+        std::cout << "Unknown command from server:" << tokens[0] << std::endl;
+    }
+}
 
-//     // Split command from client into tokens for parsing
-//     std::stringstream stream(buffer);
+std::vector<std::string> get_message(char *buffer)
+{
+    std::vector<std::string> tokens;
+    std::string token;
 
-//     while (stream >> token)
-//         tokens.push_back(token);
+    // Split command from client into tokens for parsing
+    std::stringstream stream(buffer);
 
-//     if ((tokens[0].compare("CONNECT") == 0) && (tokens.size() == 2))
-//     {
-//         clients[clientSocket]->name = tokens[1];
-//     }
-//     else if (tokens[0].compare("LEAVE") == 0)
-//     {
-//         // Close the socket, and leave the socket handling
-//         // code to deal with tidying up clients etc. when
-//         // select() detects the OS has torn down the connection.
+    while (std::getline(stream, token, ','))
+    {
+        tokens.push_back(token);
+    }
 
-//         closeClient(clientSocket, openSockets, maxfds);
-//     }
-//     else if (tokens[0].compare("WHO") == 0)
-//     {
-//         std::cout << "Who is logged on" << std::endl;
-//         std::string msg;
-
-//         for (auto const &names : clients)
-//         {
-//             msg += names.second->name + ",";
-//         }
-//         // Reducing the msg length by 1 loses the excess "," - which
-//         // granted is totally cheating.
-//         send(clientSocket, msg.c_str(), msg.length() - 1, 0);
-//     }
-//     // This is slightly fragile, since it's relying on the order
-//     // of evaluation of the if statement.
-//     else if ((tokens[0].compare("MSG") == 0) && (tokens[1].compare("ALL") == 0))
-//     {
-//         std::string msg;
-//         for (auto i = tokens.begin() + 2; i != tokens.end(); i++)
-//         {
-//             msg += *i + " ";
-//         }
-
-//         for (auto const &pair : clients)
-//         {
-//             send(pair.second->sock, msg.c_str(), msg.length(), 0);
-//         }
-//     }
-//     else if (tokens[0].compare("MSG") == 0)
-//     {
-//         for (auto const &pair : clients)
-//         {
-//             if (pair.second->name.compare(tokens[1]) == 0)
-//             {
-//                 std::string msg;
-//                 for (auto i = tokens.begin() + 2; i != tokens.end(); i++)
-//                 {
-//                     msg += *i + " ";
-//                 }
-//                 send(pair.second->sock, msg.c_str(), msg.length(), 0);
-//             }
-//         }
-//     }
-//     else
-//     {
-//         std::cout << "Unknown command from client:" << buffer << std::endl;
-//     }
-// }
+    return tokens;
+}
 
 int main(int argc, char *argv[])
 {
@@ -305,9 +298,7 @@ int main(int argc, char *argv[])
     fd_set exceptSockets; // Exception socket list
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in client;
-    struct sockaddr_in server;
     socklen_t clientLen;
-    socklen_t serverLen;
     char buffer[1025]; // buffer for reading from clients
 
     if (argc != 2)
@@ -355,6 +346,7 @@ int main(int argc, char *argv[])
 
     while (!finished)
     {
+
         // Get modifiable copy of readSockets
         readSockets = exceptSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
@@ -412,6 +404,7 @@ int main(int argc, char *argv[])
             // Now check for commands from clients
             while (n-- > 0)
             {
+
                 for (auto const &pair : clients)
                 {
                     Client *client = pair.second;
@@ -430,10 +423,19 @@ int main(int argc, char *argv[])
                         // only triggers if there is something on the socket for us.
                         else
                         {
-                            std::cout << buffer << std::endl;
-                            clientCommand(client->sock, &openSockets, &maxfds,
-                                          buffer);
+
+                            std::vector<std::string> tokens = get_message(buffer);
+
+                            if (tokens[0].compare("*") == 0)
+                            {
+                                serverCommand(client->sock, &openSockets, &maxfds, tokens);
+                            }
+                            else
+                            {
+                                clientCommand(client->sock, &openSockets, &maxfds, buffer);
+                            }
                         }
+                        break;
                     }
                 }
             }
