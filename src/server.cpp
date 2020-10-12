@@ -26,8 +26,6 @@
 #include <fcntl.h>
 
 
-#include <stdlib.h>
-
 
 #include <net/if.h>
 #include <ifaddrs.h>
@@ -146,7 +144,7 @@ public:
 std::string server_addr = getIP();
 std::string port_addr;
 std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
-
+std::map<int, std::map<std::string, Client_Server *>> servers_connections;
 // Open socket for specified port.
 //
 // Returns -1 if unable to create the socket for any reason.
@@ -312,29 +310,80 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
 }
 
-void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
+void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
 {
     std::cout<<tokens[0]<<std::endl;
 
     if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
 
+
+        //todo: add the groupid and ipaddr. and portnr.
+
+        all_clients_servers[serverSocket]->name = tokens[1];
+
+        
+
+        std::string msg = "*CONNECTED,P3_group_1,"+server_addr+ ',' +port_addr;
+    
         for (auto const &pair : all_clients_servers)
         {
-            if (pair.second->name.compare(tokens[1]) == 0)
-            {
-                std::cout<<"name already occupied"<<std::endl;
-                break;
+            if(pair.second->server){
+                if (pair.second->name.compare(tokens[1]) != 0)
+                {
+                    msg+= ";"+pair.second->name+","+pair.second->ip+",";
+                    msg+=std::to_string(pair.second->port);
+                }
             }
         }
-        //todo: add the groupid and ipaddr. and portnr.
-        std::string msg = "*CONNECTED,1,"+server_addr+ ',' +port_addr+"#";
+        msg+="#";
+        send(serverSocket, msg.c_str(), msg.length(), 0);
         
-        send(clientSocket, msg.c_str(), msg.length(), 0);
+        std::string req= "*QUERYSERVERS,P3_group_1#";
+        send(serverSocket, req.c_str(), req.length(), 0);
     }
     else if (tokens[0].compare("CONNECTED") == 0)
     {
-        std::cout << tokens[0] << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        if (all_clients_servers[serverSocket]->name.compare(tokens[1]) == 0){
+            std::map<std::string, Client_Server *> server_servers;
+            bool skip = false;
+            for (int i =1;i <= ((tokens.size()-4)/3);i++){
+
+                for (auto const &pair : all_clients_servers){
+                    std::cout<<i<<std::endl;
+                    if (pair.second->name.compare(tokens[(3*i)+1]) == 0)
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                if (skip){
+                    skip = false;
+                }
+                else{
+                    std::cout<<"made it "<<i<<std::endl;
+                    Client_Server *new_server = new Client_Server(serverSocket, true);
+                    std::string name=tokens[(i*3)+1];
+                    std::cout<<name<<(i*3)+1<<std::endl;
+                    std::cout<<tokens.size()<<std::endl;
+                    new_server->name = name;
+                    new_server->ip = tokens[(3*i)+2];
+                    new_server->port = atoi(tokens[(3*i)+3].c_str());
+                    server_servers[name] = new_server;
+                    std::cout<<"server name: ";
+                    std::cout<<new_server->name<<std::endl;
+                }
+            }
+            servers_connections[serverSocket] =server_servers;
+            
+            
+        }
+        else{
+            std::cout<<all_clients_servers[serverSocket]->name<<std::endl;
+            std::cout<<tokens[1]<<std::endl;
+            std::cout<<"not recognized server"<<std::endl;
+        }
     }
     else if (tokens[0].compare("KEEPALIVE") == 0)
     {
@@ -370,13 +419,19 @@ std::vector<std::string> get_message(char *buffer)
 {
     std::vector<std::string> tokens;
     std::string token;
+    std::string mini;
 
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
-
+    
     while (std::getline(stream, token, ','))
     {
-        tokens.push_back(token);
+        std::stringstream ss(token);
+        while(std::getline(ss, mini, ';')){
+            mini.erase(std::remove_if(mini.begin(),mini.end(),::isspace),mini.end());
+            tokens.push_back(mini);
+        }
+        
     }
 
     return tokens;
