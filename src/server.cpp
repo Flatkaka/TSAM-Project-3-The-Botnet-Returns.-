@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <list>
 
 #include <sys/un.h>
 #include <iomanip>
@@ -70,6 +71,9 @@ public:
 // (indexed on socket no.) sacrificing memory for speed.
 
 std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
+
+// map to store all stored messagges, the key is the group that that should receive the message
+std::map<std::string, std::vector<std::string>> stored_messages;
 
 // Open socket for specified port.
 //
@@ -236,6 +240,27 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
 }
 
+std::string send_message(int socket, std::string req)
+{
+    req = "*" + req + "#";
+    return "";
+}
+
+// void append_message(std::string group, std::string msg)
+// {
+//     if (stored_messages.find(group) != stored_messages.end())
+//     {
+//         // if there is already a vector in the map
+//         stored_messages[group].push_back(msg);
+//     }
+//     // create the vector and add the first message
+//     else
+//     {
+//         stored_messages[group] = std::vector<std::string>();
+//         stored_messages[group].push_back(msg);
+//     }
+// }
+
 void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
 {
 
@@ -249,15 +274,49 @@ void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[1].compare("KEEPALIVE") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+        std::cout << tokens[0] << tokens[1] << std::endl;
+        int message_count = atoi(tokens[1].c_str());
+        if (message_count > 0)
+        {
+            std::string request = "GET_MSG,P3_GROUP_1";
+            std::string response = send_message(clientSocket, request);
+            std::cout << response << std::endl;
+        }
     }
     else if (tokens[1].compare("GET_MSG") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+        // get group number
+        std::string group = tokens[1];
+        // std::cout << tokens[1] << tokens[2] << std::endl;
+        if (stored_messages.find(group) != stored_messages.end())
+        {
+            std::vector requested_messages = stored_messages[group];
+            for (std::string request : requested_messages)
+            {
+                std::string response = send_message(clientSocket, request);
+                std::cout << response << std::endl;
+            }
+        }
     }
     else if (tokens[1].compare("SEND_MSG") == 0)
     {
         std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        std::string to_group = tokens[1];
+        std::string from_group = tokens[2];
+        std::string msg = tokens[0] + tokens[1] + tokens[2] + tokens[3];
+        stored_messages[to_group].push_back(msg);
+        int count = stored_messages[to_group].size();
+        for (auto const &pair : all_clients_servers)
+        {
+            Client_Server *client = pair.second;
+            if (client->name.compare(to_group) == 0)
+            {
+                std::string msg = "KEEPALIVE," + count;
+                std::string response = send_message(clientSocket, msg);
+                std::cout << response << std::endl;
+                break;
+            }
+        }
     }
     else if (tokens[1].compare("LEAVE") == 0)
     {
