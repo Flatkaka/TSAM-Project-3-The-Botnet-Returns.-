@@ -24,8 +24,11 @@
 
 #include <sys/un.h>
 #include <iomanip>
-
 #include <fcntl.h>
+
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <errno.h>
 
 #include <iostream>
 #include <sstream>
@@ -42,7 +45,68 @@
 
 #define BACKLOG 5 // Allowed length of queue of waiting connections
 
-// Simple class for handling connections from all_clients_servers.
+std::string getIP()
+{
+    struct ifaddrs *myaddrs, *ifa;
+    void *in_addr;
+    char buf[64];
+
+    if (getifaddrs(&myaddrs) != 0)
+    {
+        perror("getifaddrs");
+        exit(1);
+    }
+
+    for (ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr == NULL)
+            continue;
+        if (!(ifa->ifa_flags & IFF_UP))
+            continue;
+
+        switch (ifa->ifa_addr->sa_family)
+        {
+        case AF_INET:
+        {
+            struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
+            in_addr = &s4->sin_addr;
+            break;
+        }
+
+        case AF_INET6:
+        {
+            struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+            in_addr = &s6->sin6_addr;
+            break;
+        }
+
+        default:
+            continue;
+        }
+        std::string name = ifa->ifa_name;
+        if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
+        {
+            printf("%s: inet_ntop failed!\n", ifa->ifa_name);
+        }
+        else if (name.compare("eno16780032") == 0)
+        {
+
+            std::string str(buf);
+            return str;
+        }
+        else if (name.compare("enp0s3") == 0)
+        {
+
+            std::string str(buf);
+            return str;
+        }
+    }
+
+    freeifaddrs(myaddrs);
+    return (std::string) "0";
+}
+
+// Simple class for handling connections from clients.
 //
 // Client_Server(int socket) - socket to send/receive traffic from client.
 class Client_Server
@@ -70,11 +134,13 @@ public:
 // Quite often a simple array can be used as a lookup table,
 // (indexed on socket no.) sacrificing memory for speed.
 
-std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
-
 // map to store all stored messagges, the key is the group that that should receive the message
 std::map<std::string, std::vector<std::string>> stored_messages;
 
+std::string server_addr = getIP();
+std::string port_addr;
+std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
+std::map<int, std::map<std::string, Client_Server *>> servers_connections;
 // Open socket for specified port.
 //
 // Returns -1 if unable to create the socket for any reason.
@@ -186,9 +252,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         // Close the socket, and leave the socket handling
         // code to deal with tidying up all_clients_servers etc. when
         // select() detects the OS has torn down the connection.
-        std::cout << "here before" << std::endl;
+
         closeClient(clientSocket, openSockets, maxfds);
-        std::cout << "here after" << std::endl;
     }
     else if (tokens[0].compare("WHO") == 0)
     {
@@ -261,29 +326,95 @@ std::string send_message(int socket, std::string req)
 //     }
 // }
 
-void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
+void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
 {
+    std::cout << tokens[0] << std::endl;
 
-    if ((tokens[1].compare("QUERYSERVERS") == 0) && (tokens.size() == 3))
+    if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+
+        //todo: add the groupid and ipaddr. and portnr.
+
+        all_clients_servers[serverSocket]->name = tokens[1];
+
+        std::string msg = "*CONNECTED,P3_group_1," + server_addr + ',' + port_addr;
+
+        for (auto const &pair : all_clients_servers)
+        {
+            if (pair.second->server)
+            {
+                if (pair.second->name.compare(tokens[1]) != 0)
+                {
+                    msg += ";" + pair.second->name + "," + pair.second->ip + ",";
+                    msg += std::to_string(pair.second->port);
+                }
+            }
+        }
+        msg += "#";
+        send(serverSocket, msg.c_str(), msg.length(), 0);
+
+        std::string req = "*QUERYSERVERS,P3_group_1#";
+        send(serverSocket, req.c_str(), req.length(), 0);
     }
-    else if (tokens[1].compare("CONNECTED") == 0)
+    else if (tokens[0].compare("CONNECTED") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << tokens[4] << std::endl;
+        if (all_clients_servers[serverSocket]->name.compare(tokens[1]) == 0)
+        {
+            std::map<std::string, Client_Server *> server_servers;
+            bool skip = false;
+            for (int i = 1; i <= ((tokens.size() - 4) / 3); i++)
+            {
+
+                for (auto const &pair : all_clients_servers)
+                {
+                    std::cout << i << std::endl;
+                    if (pair.second->name.compare(tokens[(3 * i) + 1]) == 0)
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                if (skip)
+                {
+                    skip = false;
+                }
+                else
+                {
+                    std::cout << "made it " << i << std::endl;
+                    Client_Server *new_server = new Client_Server(serverSocket, true);
+                    std::string name = tokens[(i * 3) + 1];
+                    std::cout << name << (i * 3) + 1 << std::endl;
+                    std::cout << tokens.size() << std::endl;
+                    new_server->name = name;
+                    new_server->ip = tokens[(3 * i) + 2];
+                    new_server->port = atoi(tokens[(3 * i) + 3].c_str());
+                    server_servers[name] = new_server;
+                    std::cout << "server name: ";
+                    std::cout << new_server->name << std::endl;
+                }
+            }
+            servers_connections[serverSocket] = server_servers;
+        }
+        else
+        {
+            std::cout << all_clients_servers[serverSocket]->name << std::endl;
+            std::cout << tokens[1] << std::endl;
+            std::cout << "not recognized server" << std::endl;
+        }
     }
-    else if (tokens[1].compare("KEEPALIVE") == 0)
+    else if (tokens[0].compare("KEEPALIVE") == 0)
     {
         std::cout << tokens[0] << tokens[1] << std::endl;
         int message_count = atoi(tokens[1].c_str());
         if (message_count > 0)
         {
             std::string request = "GET_MSG,P3_GROUP_1";
-            std::string response = send_message(clientSocket, request);
+            std::string response = send_message(serverSocket, request);
             std::cout << response << std::endl;
         }
     }
-    else if (tokens[1].compare("GET_MSG") == 0)
+    else if (tokens[0].compare("GET_MSG") == 0)
     {
         // get group number
         std::string group = tokens[1];
@@ -293,12 +424,12 @@ void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             std::vector requested_messages = stored_messages[group];
             for (std::string request : requested_messages)
             {
-                std::string response = send_message(clientSocket, request);
+                std::string response = send_message(serverSocket, request);
                 std::cout << response << std::endl;
             }
         }
     }
-    else if (tokens[1].compare("SEND_MSG") == 0)
+    else if (tokens[0].compare("SEND_MSG") == 0)
     {
         std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
         std::string to_group = tokens[1];
@@ -312,23 +443,23 @@ void serverCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             if (client->name.compare(to_group) == 0)
             {
                 std::string msg = "KEEPALIVE," + count;
-                std::string response = send_message(clientSocket, msg);
+                std::string response = send_message(serverSocket, msg);
                 std::cout << response << std::endl;
                 break;
             }
         }
     }
-    else if (tokens[1].compare("LEAVE") == 0)
+    else if (tokens[0].compare("LEAVE") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
     }
-    else if (tokens[1].compare("STATUSREQ") == 0)
+    else if (tokens[0].compare("STATUSREQ") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << std::endl;
+        std::cout << tokens[0] << tokens[1] << std::endl;
     }
-    else if (tokens[1].compare("STATUSRESP") == 0)
+    else if (tokens[0].compare("STATUSRESP") == 0)
     {
-        std::cout << tokens[1] << tokens[2] << tokens[3] << std::endl;
+        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
     }
     else
     {
@@ -340,13 +471,19 @@ std::vector<std::string> get_message(char *buffer)
 {
     std::vector<std::string> tokens;
     std::string token;
+    std::string mini;
 
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
 
     while (std::getline(stream, token, ','))
     {
-        tokens.push_back(token);
+        std::stringstream ss(token);
+        while (std::getline(ss, mini, ';'))
+        {
+            mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
+            tokens.push_back(mini);
+        }
     }
 
     return tokens;
@@ -365,8 +502,8 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in client;
     socklen_t clientLen;
-    char buffer[1025]; // buffer for reading from all_clients_servers
-
+    char buffer[1025]; // buffer for reading from clients
+    port_addr = argv[1];
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -498,9 +635,13 @@ int main(int argc, char *argv[])
                         {
 
                             std::vector<std::string> tokens = get_message(buffer);
+                            std::string fw = tokens[0];
+                            tokens[0] = fw.substr(1);
 
-                            if (tokens[0].compare("*") == 0)
+                            char fl = fw[0];
+                            if (fl == '*')
                             {
+
                                 serverCommand(client->sock, &openSockets, &maxfds, tokens);
                             }
                             else

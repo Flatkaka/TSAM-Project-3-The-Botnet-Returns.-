@@ -8,6 +8,9 @@
 #include <ifaddrs.h>
 #include <errno.h>
 
+#include <iostream>
+#include <sstream>
+
 int main(int argc, char *argv[])
 {
     struct ifaddrs *myaddrs, *ifa;
@@ -46,15 +49,22 @@ int main(int argc, char *argv[])
             default:
                 continue;
         }
-
+        std::string name = ifa->ifa_name;
         if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
         {
             printf("%s: inet_ntop failed!\n", ifa->ifa_name);
         }
-        else
+        else if (name.compare("eno16780032")==0)
         {
             printf("%s: %s\n", ifa->ifa_name, buf);
+            return *buf;
         }
+        else if (name.compare("enp0s3")==0)
+        {
+            printf("%s: %s\n", ifa->ifa_name, buf);
+            return *buf;
+        }
+        
     }
 
     freeifaddrs(myaddrs);
