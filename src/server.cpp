@@ -321,6 +321,29 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
     FD_CLR(socket, openSockets);
 }
 
+
+
+std::string extract_msg_string(std::string msg, int max)
+{
+
+    std::string token;
+    std::string msg;
+
+    // Split command from client into tokens for parsing
+    std::stringstream stream(msg);
+    int count = 0;
+    while (std::getline(stream, token, ','))
+    {
+        if (count >= max)
+        {
+
+            msg += token;
+        }
+        count += 1;
+    }
+
+    return msg;
+}
 std::string extract_msg(char *buffer, int max)
 {
 
@@ -429,7 +452,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
                 std::string request = requested_messages.front();
                 requested_messages.erase(requested_messages.begin());
                 stored_messages[group] = requested_messages;
-                std::string response = send_message(clientSocket, request);
+                std::string response = send_message(clientSocket, extract_msg_string(request, 3));
                 std::cout << response << std::endl;
             }
         }
@@ -438,7 +461,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         std::string from_group = tokens[2];
-        std::string msg = "*SENDMSG," + to_group + ",P3_group_1," + extract_msg(buffer, 2) + "#";
+        std::string msg = "*SENDMSG," + to_group + ","+ group_name +"," + extract_msg(buffer, 2) + "#";
 
         stored_messages[to_group].push_back(msg);
         int count = stored_messages[to_group].size();
@@ -448,7 +471,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             Client_Server *client = pair.second;
             if (client->name.compare(to_group) == 0)
             {
-                std::string msg = "KEEPALIVE," + std::to_string(count);
+                std::string msg = "*KEEPALIVE," + std::to_string(count)+"#";
                 std::string response = send_message(pair.first, msg);
                 std::cout << response << std::endl;
                 break;
@@ -545,7 +568,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         int message_count = atoi(tokens[1].c_str());
         if (message_count > 0)
         {
-            std::string request = "*GET_MSG,P3_GROUP_1#";
+            std::string request = "*GET_MSG," + group_name + "#";
             std::string response = send_message(serverSocket, request);
             std::cout << response << std::endl;
         }
