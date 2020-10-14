@@ -101,6 +101,12 @@ std::string getIP()
             std::string str(buf);
             return str;
         }
+        else if (name.compare("en0") == 0)
+        {
+
+            std::string str(buf);
+            return str;
+        }
     }
 
     freeifaddrs(myaddrs);
