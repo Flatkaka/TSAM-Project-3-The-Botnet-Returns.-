@@ -516,8 +516,11 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         msg += "#";
         send_message(serverSocket, msg);
 
-        std::string req = "*QUERYSERVERS," + group_name + '#';
-        send_message(serverSocket, req);
+        if(servers_connections.count(serverSocket)<1){
+            std::string req = "*QUERYSERVERS," + group_name + '#';
+            send_message(serverSocket, req);
+        }
+        
     }
     else if (tokens[0].compare("CONNECTED") == 0)
     {
@@ -721,12 +724,12 @@ int main(int argc, char *argv[])
 
     // Setup client socket for server to listen to
 
-    clientListenSock = open_socket(5050);
-    printf("Listening for client connections on port: %d\n", 5050);
+    clientListenSock = open_socket(atoi(argv[1])-1);
+    printf("Listening for client connections on port: %d\n", atoi(argv[1])-1);
 
     if (listen(clientListenSock, BACKLOG) < 0)
     {
-        printf("Client_Server listening failed on port %d\n", 5050);
+        printf("Client_Server listening failed on port %d\n", atoi(argv[1])-1);
         exit(0);
     }
     else
