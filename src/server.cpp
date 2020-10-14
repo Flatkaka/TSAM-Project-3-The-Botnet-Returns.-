@@ -142,6 +142,8 @@ std::string port_addr;
 std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections;
 // Open socket for specified port.
+
+std::string group_name = "P3_GROUP_1";
 //
 // Returns -1 if unable to create the socket for any reason.
 
@@ -337,7 +339,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
         all_clients_servers[serverSocket]->name = tokens[1];
 
-        std::string msg = "*CONNECTED,P3_group_1," + server_addr + ',' + port_addr;
+        std::string msg = "*CONNECTED," + group_name + "," + server_addr + ',' + port_addr;
 
         for (auto const &pair : all_clients_servers)
         {
@@ -409,7 +411,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         int message_count = atoi(tokens[1].c_str());
         if (message_count > 0)
         {
-            std::string request = "GET_MSG,P3_GROUP_1";
+            std::string request = "*GET_MSG,P3_GROUP_1#";
             std::string response = send_message(serverSocket, request);
             std::cout << response << std::endl;
         }
@@ -421,7 +423,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         // std::cout << tokens[1] << tokens[2] << std::endl;
         if (stored_messages.find(group) != stored_messages.end())
         {
-            std::vector requested_messages = stored_messages[group];
+            std::vector<std::string> requested_messages = stored_messages[group];
             for (std::string request : requested_messages)
             {
                 std::string response = send_message(serverSocket, request);
@@ -442,7 +444,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             Client_Server *client = pair.second;
             if (client->name.compare(to_group) == 0)
             {
-                std::string msg = "KEEPALIVE," + count;
+                std::string msg = "*KEEPALIVE," + count + '#';
                 std::string response = send_message(serverSocket, msg);
                 std::cout << response << std::endl;
                 break;
@@ -455,7 +457,17 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
-        std::cout << tokens[0] << tokens[1] << std::endl;
+        std::string from_group = tokens[1];
+        std::string message = "*STATUSRESP," + group_name + ',' + from_group;
+        for (auto const &pair : stored_messages)
+        {
+            std::string group = pair.first;
+            int message_count = pair.second.size();
+            message += ',' + group + ',' + std::to_string(message_count);
+        }
+        message += '#';
+        std::string response = send_message(serverSocket, message);
+        std::cout << response << std::endl;
     }
     else if (tokens[0].compare("STATUSRESP") == 0)
     {
