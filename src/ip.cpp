@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     void *in_addr;
     char buf[64];
 
-    if(getifaddrs(&myaddrs) != 0)
+    if (getifaddrs(&myaddrs) != 0)
     {
         perror("getifaddrs");
         exit(1);
@@ -32,39 +32,38 @@ int main(int argc, char *argv[])
 
         switch (ifa->ifa_addr->sa_family)
         {
-            case AF_INET:
-            {
-                struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
-                in_addr = &s4->sin_addr;
-                break;
-            }
+        case AF_INET:
+        {
+            struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
+            in_addr = &s4->sin_addr;
+            break;
+        }
 
-            case AF_INET6:
-            {
-                struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-                in_addr = &s6->sin6_addr;
-                break;
-            }
+        case AF_INET6:
+        {
+            struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+            in_addr = &s6->sin6_addr;
+            break;
+        }
 
-            default:
-                continue;
+        default:
+            continue;
         }
         std::string name = ifa->ifa_name;
         if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
         {
             printf("%s: inet_ntop failed!\n", ifa->ifa_name);
         }
-        else if (name.compare("eno16780032")==0)
+        else if (name.compare("eno16780032") == 0)
         {
             printf("%s: %s\n", ifa->ifa_name, buf);
             return *buf;
         }
-        else if (name.compare("enp0s3")==0)
+        else if (name.compare("enp0s3") == 0)
         {
             printf("%s: %s\n", ifa->ifa_name, buf);
             return *buf;
         }
-        
     }
 
     freeifaddrs(myaddrs);

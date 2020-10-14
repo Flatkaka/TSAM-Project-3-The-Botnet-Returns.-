@@ -17,6 +17,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <net/if.h>
 #include <algorithm>
 #include <map>
 #include <vector>
@@ -140,9 +141,11 @@ std::map<std::string, std::vector<std::string>> stored_messages;
 std::string server_addr = getIP();
 std::string port_addr;
 std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
+int server_count;                                   // number of servers connected
 std::map<int, std::map<std::string, Client_Server *>> servers_connections;
 // Open socket for specified port.
 
+// global variable storing the name of our group
 std::string group_name = "P3_GROUP_1";
 //
 // Returns -1 if unable to create the socket for any reason.
@@ -202,19 +205,107 @@ int open_socket(int portno)
     }
 }
 
+std::string send_message(int socket, std::string req)
+{
+    int nwrite = send(socket, req.c_str(), req.length(), 0);
+
+    if (nwrite == -1)
+    {
+        perror("send() to server failed: ");
+    }
+    return "";
+}
+
+int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfds)
+{
+    struct addrinfo hints, *svr;  // Network host entry for server
+    struct sockaddr_in serv_addr; // Socket address for server
+    int serverSocket;             // Socket used for server
+    int nwrite;                   // No. bytes written to server
+    char buffer[1025];            // buffer for writing to server
+    bool finished;
+    int set = 1; // Toggle for setsockopt
+
+    hints.ai_family = AF_INET; // IPv4 only addresses
+    hints.ai_socktype = SOCK_STREAM;
+
+    memset(&hints, 0, sizeof(hints));
+
+    if (getaddrinfo(address, port, &hints, &svr) != 0)
+    {
+        perror("getaddrinfo failed: ");
+        exit(0);
+    }
+
+    struct hostent *server;
+    server = gethostbyname(address);
+
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr,
+          (char *)&serv_addr.sin_addr.s_addr,
+          server->h_length);
+    serv_addr.sin_port = htons(atoi(port));
+
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    // Turn on SO_REUSEADDR to allow socket to be quickly reused after
+    // program exit.
+
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &set, sizeof(set)) < 0)
+    {
+        printf("Failed to set SO_REUSEADDR for port %s\n", port);
+        perror("setsockopt failed: ");
+    }
+
+    if (connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("Failed to open socket to server: %s\n", address);
+        perror("Connect failed: ");
+        exit(0);
+    }
+
+    printf("Server - accept***\n");
+    // Add new client to the list of open sockets
+    FD_SET(serverSocket, openSockets);
+
+    // And update the maximum file descriptor
+    *maxfds = std::max(*maxfds, serverSocket);
+
+    // create a new client to store information.
+    Client_Server *new_server = new Client_Server(serverSocket, true);
+    new_server->ip = address;
+    new_server->port = atoi(port);
+    all_clients_servers[serverSocket] = new_server;
+
+    // increase number of servers connected
+    server_count++;
+
+    // follow protocol and send QUERYSERVERS after new connecton...
+    std::string req = "*QUERYSERVERS," + group_name + '#';
+    send_message(serverSocket, req);
+    return 0;
+}
+
 // Close a client's connection, remove it from the client list, and
 // tidy up select sockets afterwards.
 
-void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
+void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 {
+    if (server)
+    {
+        // Remove client from the all_clients_servers list
+        stored_messages[all_clients_servers[socket]->name];
+        server_count--;
+    }
     // Remove client from the all_clients_servers list
-    all_clients_servers.erase(clientSocket);
+    all_clients_servers.erase(socket);
 
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
     // so there aren't any nice ways to do this.
 
-    if (*maxfds == clientSocket)
+    if (*maxfds == socket)
     {
 
         *maxfds = 0;
@@ -227,37 +318,8 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 
     // And remove from the list of open sockets.
 
-    FD_CLR(clientSocket, openSockets);
+    FD_CLR(socket, openSockets);
 }
-
-
-void closeServer(int serverSocket, fd_set *openSockets, int *maxfds)
-{
-    // Remove client from the all_clients_servers list
-    stored_messages[all_clients_servers[serverSocket]->name];
-    all_clients_servers.erase(serverSocket);
-
-    servers_connections.erase(serverSocket);
-    // If this client's socket is maxfds then the next lowest
-    // one has to be determined. Socket fd's can be reused by the Kernel,
-    // so there aren't any nice ways to do this.
-
-    if (*maxfds == serverSocket)
-    {
-
-        *maxfds = 0;
-
-        for (auto const &p : all_clients_servers)
-        {
-            *maxfds = std::max(*maxfds, p.second->sock);
-        }
-    }
-
-    // And remove from the list of open sockets.
-
-    FD_CLR(serverSocket, openSockets);
-}
-
 
 // Process command from client on the server
 
@@ -284,7 +346,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
         // code to deal with tidying up all_clients_servers etc. when
         // select() detects the OS has torn down the connection.
 
-        closeClient(clientSocket, openSockets, maxfds);
+        closeClient(clientSocket, openSockets, maxfds, false);
     }
     else if (tokens[0].compare("WHO") == 0)
     {
@@ -336,27 +398,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buf
     }
 }
 
-std::string send_message(int socket, std::string req)
-{
-    req = "*" + req + "#";
-    return "";
-}
-
-// void append_message(std::string group, std::string msg)
-// {
-//     if (stored_messages.find(group) != stored_messages.end())
-//     {
-//         // if there is already a vector in the map
-//         stored_messages[group].push_back(msg);
-//     }
-//     // create the vector and add the first message
-//     else
-//     {
-//         stored_messages[group] = std::vector<std::string>();
-//         stored_messages[group].push_back(msg);
-//     }
-// }
-
 void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens)
 {
     std::cout << tokens[0] << std::endl;
@@ -382,10 +423,10 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             }
         }
         msg += "#";
-        send(serverSocket, msg.c_str(), msg.length(), 0);
+        send_message(serverSocket, msg);
 
-        std::string req = "*QUERYSERVERS,P3_group_1#";
-        send(serverSocket, req.c_str(), req.length(), 0);
+        std::string req = "*QUERYSERVERS," + group_name + '#';
+        send_message(serverSocket, req);
     }
     else if (tokens[0].compare("CONNECTED") == 0)
     {
@@ -473,7 +514,8 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             Client_Server *client = pair.second;
             if (client->name.compare(to_group) == 0)
             {
-                std::string msg = "*KEEPALIVE," + count + '#';
+                std::string msg = "*KEEPALIVE," + std::to_string(count);
+                msg += '#';
                 std::string response = send_message(serverSocket, msg);
                 std::cout << response << std::endl;
                 break;
@@ -482,7 +524,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("LEAVE") == 0)
     {
-        closeServer(serverSocket, openSockets, maxfds);
+        closeClient(serverSocket, openSockets, maxfds, true);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
@@ -541,8 +583,8 @@ int main(int argc, char *argv[])
     fd_set readSockets;   // Socket list for select()
     fd_set exceptSockets; // Exception socket list
     int maxfds;           // Passed to select() as max fd in set
-    struct sockaddr_in client;
-    socklen_t clientLen;
+    struct sockaddr_in new_connection;
+    socklen_t connectionLen;
     char buffer[1025]; // buffer for reading from clients
     port_addr = argv[1];
     if (argc != 2)
@@ -608,8 +650,8 @@ int main(int argc, char *argv[])
             // First, accept  any new client connections to the server on the client listening socket
             if (FD_ISSET(clientListenSock, &readSockets))
             {
-                clientSock = accept(clientListenSock, (struct sockaddr *)&client,
-                                    &clientLen);
+                clientSock = accept(clientListenSock, (struct sockaddr *)&new_connection,
+                                    &connectionLen);
                 printf("Client_Server - accept***\n");
                 // Add new client to the list of open sockets
                 FD_SET(clientSock, &openSockets);
@@ -628,8 +670,8 @@ int main(int argc, char *argv[])
             // Next, accept  any new server connections to the server on the server listening socket
             if (FD_ISSET(serverListenSock, &readSockets))
             {
-                serverSock = accept(serverListenSock, (struct sockaddr *)&client,
-                                    &clientLen);
+                serverSock = accept(serverListenSock, (struct sockaddr *)&new_connection,
+                                    &connectionLen);
                 printf("Server - accept***\n");
                 // Add new client to the list of open sockets
                 FD_SET(serverSock, &openSockets);
@@ -639,13 +681,16 @@ int main(int argc, char *argv[])
 
                 char ip_str[INET_ADDRSTRLEN];
                 // now get it back and print it
-                inet_ntop(AF_INET, &(client.sin_addr), ip_str, INET_ADDRSTRLEN);
+                inet_ntop(AF_INET, &(new_connection.sin_addr), ip_str, INET_ADDRSTRLEN);
 
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-                new_server->port = client.sin_port;
+                new_server->port = new_connection.sin_port;
                 all_clients_servers[serverSock] = new_server;
+
+                // increase number of servers connected
+                server_count++;
 
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
@@ -658,6 +703,7 @@ int main(int argc, char *argv[])
 
                 for (auto const &pair : all_clients_servers)
                 {
+                    // client can be both client and server, more conveniient to use same name
                     Client_Server *client = pair.second;
 
                     if (FD_ISSET(client->sock, &readSockets))
@@ -666,9 +712,10 @@ int main(int argc, char *argv[])
                         if (recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
                         {
                             printf("Client_Server closed connection: %d", client->sock);
+
                             close(client->sock);
                             // TODO: close servers
-                            closeClient(client->sock, &openSockets, &maxfds);
+                            closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
                         // We don't check for -1 (nothing received) because select()
                         // only triggers if there is something on the socket for us.
