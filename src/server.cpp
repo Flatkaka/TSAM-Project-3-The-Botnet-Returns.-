@@ -228,6 +228,35 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
     FD_CLR(clientSocket, openSockets);
 }
 
+
+void closeServer(int serverSocket, fd_set *openSockets, int *maxfds)
+{
+    // Remove client from the all_clients_servers list
+    stored_messages[all_clients_servers[serverSocket]->name];
+    all_clients_servers.erase(serverSocket);
+
+    servers_connections.erase(serverSocket);
+    // If this client's socket is maxfds then the next lowest
+    // one has to be determined. Socket fd's can be reused by the Kernel,
+    // so there aren't any nice ways to do this.
+
+    if (*maxfds == serverSocket)
+    {
+
+        *maxfds = 0;
+
+        for (auto const &p : all_clients_servers)
+        {
+            *maxfds = std::max(*maxfds, p.second->sock);
+        }
+    }
+
+    // And remove from the list of open sockets.
+
+    FD_CLR(serverSocket, openSockets);
+}
+
+
 // Process command from client on the server
 
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, char *buffer)
@@ -421,7 +450,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         // std::cout << tokens[1] << tokens[2] << std::endl;
         if (stored_messages.find(group) != stored_messages.end())
         {
-            std::vector requested_messages = stored_messages[group];
+            std::vector<std::string> requested_messages = stored_messages[group];
             for (std::string request : requested_messages)
             {
                 std::string response = send_message(serverSocket, request);
@@ -451,7 +480,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("LEAVE") == 0)
     {
-        std::cout << tokens[0] << tokens[1] << tokens[2] << std::endl;
+        closeServer(serverSocket, openSockets, maxfds);
     }
     else if (tokens[0].compare("STATUSREQ") == 0)
     {
