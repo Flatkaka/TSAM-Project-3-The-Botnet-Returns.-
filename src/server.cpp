@@ -136,17 +136,21 @@ public:
 // (indexed on socket no.) sacrificing memory for speed.
 
 // map to store all stored messagges, the key is the group that that should receive the message
-std::map<std::string, std::vector<std::string>> stored_messages;
 
+
+//global variables.
+std::map<std::string, std::vector<std::string>> stored_messages;
+std::map<int, Client_Server *> all_clients_servers;                         // Lookup table for per Client_Server information
+std::map<int, std::map<std::string, Client_Server *>> servers_connections;  //lookuptable to see what server are connected to the servers our server is connect.
 std::string server_addr = getIP();
 std::string port_addr;
-std::map<int, Client_Server *> all_clients_servers; // Lookup table for per Client_Server information
-int server_count;                                   // number of servers connected
-std::map<int, std::map<std::string, Client_Server *>> servers_connections;
+std::string group_name = "P3_GROUP_1";                                      // global variable storing the name of our group
+int server_count;                                                           // number of servers connected
+
 // Open socket for specified port.
 
-// global variable storing the name of our group
-std::string group_name = "P3_GROUP_1";
+
+
 //
 // Returns -1 if unable to create the socket for any reason.
 
