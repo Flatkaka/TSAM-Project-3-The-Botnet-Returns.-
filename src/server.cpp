@@ -222,10 +222,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     struct addrinfo hints, *svr;  // Network host entry for server
     struct sockaddr_in serv_addr; // Socket address for server
     int serverSocket;             // Socket used for server
-    int nwrite;                   // No. bytes written to server
-    char buffer[1025];            // buffer for writing to server
-    bool finished;
-    int set = 1; // Toggle for setsockopt
+    int set = 1;                  // Toggle for setsockopt
 
     hints.ai_family = AF_INET; // IPv4 only addresses
     hints.ai_socktype = SOCK_STREAM;
@@ -436,8 +433,11 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         int count = 1;
         for (auto const &pair : all_clients_servers)
         {
-            msg += std::to_string(count) + ":" + pair.second->name + "," + pair.second->ip + "," + std::to_string(pair.second->port) + "\n";
-            count += 1;
+            if (pair.second->server)
+            {
+                msg += std::to_string(count) + ":" + pair.second->name + "," + pair.second->ip + "," + std::to_string(pair.second->port) + "\n";
+                count += 1;
+            }
         }
         send(clientSocket, msg.c_str(), msg.length(), 0);
     }
@@ -524,7 +524,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         {
             std::map<std::string, Client_Server *> server_servers;
             bool skip = false;
-            for (int i = 1; i <= ((tokens.size() - 4) / 3); i++)
+            for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
             {
 
                 for (auto const &pair : all_clients_servers)
@@ -648,18 +648,53 @@ std::vector<std::string> get_message(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
+    bool star = false;
+    bool hash = false;
 
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
-
+    int count = 0;
     while (std::getline(stream, token, ','))
     {
+        //check if there is star in the begining of the command
+        if (count == 0)
+        {
+            char firstletter = token.front();
+            if (firstletter == '*')
+            {
+
+                star = true;
+                token = token.substr(1);
+                ;
+            }
+        }
+
+        token.erase(std::remove_if(token.begin(), token.end(), ::isspace), token.end());
+
         std::stringstream ss(token);
         while (std::getline(ss, mini, ';'))
         {
+            //remove whtiespace
             mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
             tokens.push_back(mini);
         }
+    }
+
+    //check if the last letter is #
+    char lastletter = token.back();
+
+    if (lastletter == '#')
+    {
+
+        hash = true;
+        tokens.pop_back();
+        token = token.substr(0, token.size() - 1);
+        tokens.push_back(token);
+    }
+
+    if (star && hash)
+    {
+        tokens.push_back("#*#");
     }
 
     return tokens;
@@ -680,6 +715,7 @@ int main(int argc, char *argv[])
     socklen_t connectionLen;
     char buffer[1025]; // buffer for reading from clients
     port_addr = argv[1];
+
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -775,7 +811,7 @@ int main(int argc, char *argv[])
                 char ip_str[INET_ADDRSTRLEN];
                 // now get it back and print it
                 inet_ntop(AF_INET, &(new_connection.sin_addr), ip_str, INET_ADDRSTRLEN);
-
+                std::cout << new_connection.sin_port << " " << ip_str << std::endl;
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
@@ -815,12 +851,10 @@ int main(int argc, char *argv[])
                         {
 
                             std::vector<std::string> tokens = get_message(buffer);
-                            std::string fw = tokens[0];
 
-                            char fl = fw[0];
-                            if (fl == '*')
+                            if (tokens.back().compare("#*#") == 0)
                             {
-                                tokens[0] = fw.substr(1);
+                                tokens.pop_back();
                                 serverCommand(client->sock, &openSockets, &maxfds, tokens, buffer);
                             }
                             else
