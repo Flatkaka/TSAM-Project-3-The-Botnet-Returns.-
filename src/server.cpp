@@ -23,6 +23,7 @@
 #include <vector>
 #include <list>
 
+#include <thread>
 #include <sys/un.h>
 #include <iomanip>
 #include <fcntl.h>
@@ -308,7 +309,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
     if (*maxfds == socket)
     {
 
-        *maxfds = 0;
+        *maxfds = 4;
 
         for (auto const &p : all_clients_servers)
         {
@@ -472,6 +473,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         std::cout << "Unknown command from client:" << tokens[0] << std::endl;
     }
 }
+
+// Process command from server on the server
 
 void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens, char *buffer)
 {
@@ -649,6 +652,7 @@ int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
     }
     return -1;
 }
+
 //split the buffer on commas and semicommas into tokens.
 std::vector<std::string> tokenize_command(char *buffer)
 {
@@ -708,6 +712,22 @@ std::vector<std::string> tokenize_command(char *buffer)
     return tokens;
 }
 
+
+
+void send_keepalive(){
+
+    while(true){
+        for (auto const &pair : all_clients_servers)
+        {
+            std::vector<std::string> messages = stored_messages[pair.second->name];
+            std::string msg ="*KEEPALIVE,"+std::to_string(messages.size())+"#";
+            std::cout<<msg<<std::endl;
+            send_message(pair.first, msg);
+        }
+        sleep(30);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     bool finished;
@@ -764,8 +784,12 @@ int main(int argc, char *argv[])
         maxfds = std::max(maxfds, serverListenSock);
     }
 
+
+    std::thread keepalivethread(send_keepalive);
+
     finished = false;
 
+    
     while (!finished)
     {
 
@@ -774,8 +798,9 @@ int main(int argc, char *argv[])
         memset(buffer, 0, sizeof(buffer));
 
         // Look at sockets and see which ones have something to be read()
+        std::cout<<maxfds<<std::endl;
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-
+        
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -783,6 +808,7 @@ int main(int argc, char *argv[])
         }
         else
         {
+
             // First, accept  any new client connections to the server on the client listening socket
             if (FD_ISSET(clientListenSock, &readSockets))
             {
@@ -834,6 +860,7 @@ int main(int argc, char *argv[])
                 printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
+            std::cout<<"stuck 3"<<std::endl;
             while (n-- > 0)
             {
                 for (auto const &pair : all_clients_servers)
@@ -846,7 +873,7 @@ int main(int argc, char *argv[])
                         // recv() == 0 means client has closed connection
                         if (recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
                         {
-                            printf("Client/Server closed connection: %d", client->sock);
+                            std::cout<<"Client/Server closed connection: %d"<< client->sock<<"\n"<<std::endl;
 
                             close(client->sock);
                             // TODO: close servers
@@ -879,4 +906,5 @@ int main(int argc, char *argv[])
             
         }
     }
+    
 }
