@@ -210,7 +210,7 @@ int open_socket(int portno)
 std::string send_message(int socket, std::string req)
 {
     int nwrite = send(socket, req.c_str(), req.length(), 0);
-    std::cout<<"we send: "<< req<<std::endl;
+    std::cout<<"we send to "<<socket<<" this: "<< req<<std::endl;
     if (nwrite < 0)
     {
         perror("send() to server failed: ");
@@ -367,6 +367,64 @@ int find_server_to_send_MSG(std::string to_group, int count, std::string msg){
 }
 
 
+void remove_from_server_connections(std::string name){
+
+    std::vector<int> remove_outer;
+    std::vector<std::string> remove_inner;
+
+    for (auto const &pair : servers_connections)
+    {
+        std::cout<<"\n";
+        std::cout<<pair.first<<" is connected to:";
+        //run through each server that the servers we are connected to see what server they are connected
+        for (auto const &pair2 : pair.second)
+        {
+            std::cout<<pair2.first<<" ";
+            if(pair2.first.compare(name)==0){
+                std::cout<<"Removed :"<<name<<std::endl;
+                remove_outer.push_back(pair.first);
+                remove_inner.push_back(pair2.first);
+            }
+        } 
+    }
+    for (int i =0; i < (int) remove_outer.size(); i++){
+        servers_connections[remove_outer[i]].erase(remove_inner[i]);
+    }
+}
+
+
+//connect to servers that the servers that we are connected are connected to.
+int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
+
+    //run through all of the servers we are connect
+    for (auto const &pair : servers_connections)
+    {
+        //run through each server that the servers we are connected to see what server they are connected
+        for (auto const &pair2 : pair.second)
+        {
+            //change string to char.
+            std::string ip = pair2.second->ip;
+            std::string port_str = std::to_string(pair2.second->port);
+            char *server_address = new char[ip.length() + 1];
+            strcpy(server_address, ip.c_str());
+            char *port = new char[port_str.length() + 1];
+            strcpy(port, port_str.c_str());
+            std::cout<<"ip and port for group "<< pair2.first<<" are "<< ip<< port_str<<std::endl;
+            //try to connect that server that we are not connected to.
+            if(connect_to_server(server_address, port, openSockets, maxfds)){
+                //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
+                std::map<std::string, Client_Server *> server_servers=pair.second;
+                server_servers.erase(pair2.first);
+                remove_from_server_connections(pair2.first);
+                servers_connections[pair.first]=server_servers;
+                std::cout<<"Removed in:"<<pair.first<<std::endl;
+                return 1;
+            }
+        } 
+    }
+    return -1;
+}
+
 std::string extract_msg_string(std::string message, int max)
 {
 
@@ -503,10 +561,10 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         msg += "#";
         send_message(serverSocket, msg);
 
-        if(servers_connections.count(serverSocket)<1){
-            std::string req = "*QUERYSERVERS," + group_name + '#';
-            send_message(serverSocket, req);
-        }
+        // if(servers_connections.count(serverSocket)<1){
+        //     std::string req = "*QUERYSERVERS," + group_name + '#';
+        //     send_message(serverSocket, req);
+        // }
         
     }
     else if (tokens[0].compare("CONNECTED") == 0)
@@ -544,6 +602,9 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             skip = false;
         }
         servers_connections[serverSocket] = server_servers;
+        if(server_count<12){
+            connect_to_server_in_servers_connections(openSockets, maxfds);
+        }
 
     }
     else if (tokens[0].compare("KEEPALIVE") == 0)
@@ -623,35 +684,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     }
 }
 
-//connect to servers that the servers that we are connected are connected to.
-int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
-    
-    //run through all of the servers we are connect
-    for (auto const &pair : servers_connections)
-    {
-        //run through each server that the servers we are connected to see what server they are connected
-        for (auto const &pair2 : pair.second)
-        {
-            //change string to char.
-            std::string ip = pair2.second->ip;
-            std::string port_str = std::to_string(pair2.second->port);
-            char *server_address = new char[ip.length() + 1];
-            strcpy(server_address, ip.c_str());
-            char *port = new char[port_str.length() + 1];
-            strcpy(port, port_str.c_str());
 
-            //try to connect that server that we are not connected to.
-            if(connect_to_server(server_address, port, openSockets, maxfds)){
-                //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
-                std::map<std::string, Client_Server *> server_servers=pair.second;
-                server_servers.erase(pair2.first);
-                servers_connections[pair.first]=server_servers;
-                return 1;
-            }
-        } 
-    }
-    return -1;
-}
 
 //split the buffer on commas and semicommas into tokens.
 std::vector<std::string> tokenize_command(char *buffer)
@@ -713,18 +746,20 @@ std::vector<std::string> tokenize_command(char *buffer)
 }
 
 
-
+//send keepalive too all the servers we re conneceted to.
 void send_keepalive(){
 
     while(true){
         for (auto const &pair : all_clients_servers)
-        {
-            std::vector<std::string> messages = stored_messages[pair.second->name];
-            std::string msg ="*KEEPALIVE,"+std::to_string(messages.size())+"#";
-            std::cout<<msg<<std::endl;
-            send_message(pair.first, msg);
+        {   
+            if(pair.second->server){
+                std::vector<std::string> messages = stored_messages[pair.second->name];
+                std::string msg ="*KEEPALIVE,"+std::to_string(messages.size())+"#";
+                std::cout<<msg<<std::endl;
+                send_message(pair.first, msg);
+            }  
         }
-        sleep(30);
+        sleep(90);
     }
 }
 
@@ -743,6 +778,7 @@ int main(int argc, char *argv[])
     socklen_t connectionLen;
     char buffer[1025]; // buffer for reading from clients
     port_addr = argv[1];
+
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -798,7 +834,7 @@ int main(int argc, char *argv[])
         memset(buffer, 0, sizeof(buffer));
 
         // Look at sockets and see which ones have something to be read()
-        std::cout<<maxfds<<std::endl;
+
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
         
         if (n < 0)
@@ -860,7 +896,7 @@ int main(int argc, char *argv[])
                 printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
-            std::cout<<"stuck 3"<<std::endl;
+
             while (n-- > 0)
             {
                 for (auto const &pair : all_clients_servers)
@@ -883,7 +919,7 @@ int main(int argc, char *argv[])
                         // only triggers if there is something on the socket for us.
                         else
                         {
-                            std::cout<<"buffer: "<<buffer<<std::endl;
+                            std::cout<<"Buffer "<<client->sock<<" send: "<<buffer<<std::endl;
                             std::vector<std::string> tokens = tokenize_command(buffer);
 
                             if (tokens.back().compare("#*#") == 0)
@@ -900,9 +936,7 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            if(server_count<12){
-                connect_to_server_in_servers_connections(&openSockets, &maxfds);
-            }
+            
             
         }
     }
