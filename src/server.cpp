@@ -23,6 +23,7 @@
 #include <vector>
 #include <list>
 
+#include <set>
 #include <thread>
 #include <sys/un.h>
 #include <iomanip>
@@ -119,11 +120,15 @@ public:
     int port;         // port of client
     std::string ip;   // ip address of client
     bool server;      // true if connection is from another server
+    bool verified;
+    bool sent;
 
     Client_Server(int socket, bool is_server)
     {
         sock = socket;
         server = is_server;
+        verified = false;
+        sent = false;
     }
 
     ~Client_Server() {} // Virtual destructor defined for base class
@@ -275,6 +280,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     Client_Server *new_server = new Client_Server(serverSocket, true);
     new_server->ip = address;
     new_server->port = atoi(port);
+    new_server->sent = true;
     all_clients_servers[serverSocket] = new_server;
 
     // increase number of servers connected
@@ -325,7 +331,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 
 int find_server_to_send_MSG(std::string to_group, int count, std::string msg){
     std::cout<<"message recived"<<std::endl;
-    bool found =false;
+
     //see if the server that should recive the msg is connecet to us.
     for (auto const &pair : all_clients_servers)
     {
@@ -336,33 +342,32 @@ int find_server_to_send_MSG(std::string to_group, int count, std::string msg){
             msg += '#';
             std::string response = send_message(pair.first, msg);
             std::cout << response << std::endl;
-            found = true;
+
             return 1;
         }
     }
-    if (!found){
-        //run through all of the servers we are connect
-        for (auto const &pair : servers_connections)
-        {
-            //run through each server that the servers we are connected to see what server they are connected
-            for (auto const &pair2 : pair.second)
-            {
-                Client_Server *client = pair2.second;
-                if (client->name.compare(to_group) == 0)
-                {
-                    std::string msg = "*KEEPALIVE," + std::to_string(count);
-                    msg += '#';
-                    std::string response = send_message(pair.first, msg);
-                    std::cout << response << std::endl;
-                    return 1;
-                }
-            } 
 
-        }
+    for (auto const &pair : servers_connections)
+    {
+        //run through each server that the servers we are connected to see what server they are connected
+        for (auto const &pair2 : pair.second)
+        {
+            Client_Server *client = pair2.second;
+            if (client->name.compare(to_group) == 0)
+            {
+                std::string msg = "*KEEPALIVE," + std::to_string(count);
+                msg += '#';
+                std::string response = send_message(pair.first, msg);
+                std::cout << response << std::endl;
+                return 1;
+            }
+        } 
+
     }
-    if(!found){
-        std::cout<<"Could not find server: "<< to_group<< "to send"<< msg<<std::endl;
-    }
+
+
+    std::cout<<"Could not find server: "<< to_group<< "to send"<< msg<<std::endl;
+
     return 0;
 }
 
@@ -392,6 +397,40 @@ void remove_from_server_connections(std::string name){
     }
 }
 
+
+void send_connected(int serverSocket, std::string name){
+    std::string msg = "*CONNECTED," + group_name + "," + server_addr + ',' + port_addr;
+    std::set<std::vector<std::string>> all_servers;
+    for (auto const &pair : all_clients_servers)
+    {
+        if (pair.second->server)
+        {
+            std::vector<std::string> server;
+            server.push_back(pair.second->name);
+            server.push_back(pair.second->ip);
+            server.push_back( std::to_string(pair.second->port));
+            all_servers.insert(server);
+            for (auto const &pair2 : servers_connections[pair.first]){
+                std::vector<std::string> server;
+                server.push_back(pair2.second->name);
+                server.push_back(pair2.second->ip);
+                server.push_back( std::to_string(pair2.second->port));
+                all_servers.insert(server);
+            }
+        }
+    }
+    for (auto e : all_servers)
+    {
+        if (e[0].compare(name) != 0 && e[0].empty() == false)
+            {
+                msg += ";" + e[0] + "," + e[1] + ","+e[2];
+
+            }
+            
+    }
+    msg += "#";
+    send_message(serverSocket, msg);
+}
 
 //connect to servers that the servers that we are connected are connected to.
 int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
@@ -541,146 +580,153 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
 
-        //todo: add the groupid and ipaddr. and portnr.
-
         all_clients_servers[serverSocket]->name = tokens[1];
-
-        std::string msg = "*CONNECTED," + group_name + "," + server_addr + ',' + port_addr;
-
-        for (auto const &pair : all_clients_servers)
-        {
-            if (pair.second->server)
-            {
-                if (pair.second->name.compare(tokens[1]) != 0 && pair.second->name.empty() == false)
-                {
-                    msg += ";" + pair.second->name + "," + pair.second->ip + ",";
-                    msg += std::to_string(pair.second->port);
-                }
-            }
+        all_clients_servers[serverSocket]->verified=true;
+        if(!all_clients_servers[serverSocket]->sent){
+            std::string req = "*QUERYSERVERS," + group_name + '#';
+            send_message(serverSocket, req);
         }
-        msg += "#";
-        send_message(serverSocket, msg);
 
-        // if(servers_connections.count(serverSocket)<1){
-        //     std::string req = "*QUERYSERVERS," + group_name + '#';
-        //     send_message(serverSocket, req);
-        // }
+        if(server_addr.compare("0.0.0.0")!=0){
+
+
+            send_connected(serverSocket, tokens[1]);
+        }
+
         
     }
-    else if (tokens[0].compare("CONNECTED") == 0)
-    {
-        if (all_clients_servers[serverSocket]->name.compare(tokens[1]) != 0)
+    else if(all_clients_servers[serverSocket]->verified){
+        if (tokens[0].compare("CONNECTED") == 0)
         {
-            all_clients_servers[serverSocket]->name;
-        }
-        std::map<std::string, Client_Server *> server_servers;
-        bool skip = false;
-        for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
-        {
-
-            for (auto const &pair : all_clients_servers)
-            {
-                if (pair.second->name.compare(tokens[(3 * i) + 1]) == 0)
+            if(server_addr.compare("0.0.0.0")==0){
+                for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
                 {
-                    skip = true;
-                    break;
+
+                    if (group_name.compare(tokens[(3 * i) + 1]) == 0)
+                    {
+                        server_addr=tokens[(3 * i) + 2];
+                    }
+                    send_connected(serverSocket, tokens[1]);
                 }
             }
-            std::string name = tokens[(i * 3) + 1];
-            if(group_name.compare(name)!=0 && !skip)
+            if (all_clients_servers[serverSocket]->name.compare(tokens[1]) != 0)
             {
-
-
-                Client_Server *new_server = new Client_Server(serverSocket, true);
-                std::string name = tokens[(i * 3) + 1];
-                new_server->name = name;
-                new_server->ip = tokens[(3 * i) + 2];
-                new_server->port = atoi(tokens[(3 * i) + 3].c_str());
-                server_servers[name] = new_server;
-                std::cout << "server name: "<< new_server->name << std::endl;
+                all_clients_servers[serverSocket]->name=tokens[1];
             }
-            skip = false;
-        }
-        servers_connections[serverSocket] = server_servers;
-        if(server_count<12){
-            connect_to_server_in_servers_connections(openSockets, maxfds);
-        }
-
-    }
-    else if (tokens[0].compare("KEEPALIVE") == 0)
-    {
-        int message_count = atoi(tokens[1].c_str());
-        if (message_count > 0)
-        {
-            std::string request = "*GET_MSG," + group_name + "#";
-            std::string response = send_message(serverSocket, request);
-            std::cout << response << std::endl;
-        }
-    }
-    else if (tokens[0].compare("GET_MSG") == 0)
-    {
-        // get group number
-        std::string group = tokens[1];
-        // std::cout << tokens[1] << tokens[2] << std::endl;
-        if (stored_messages.find(group) != stored_messages.end())
-        {
-            std::vector<std::string> requested_messages = stored_messages[group];
-            for (std::string request : requested_messages)
+            std::map<std::string, Client_Server *> server_servers;
+            bool skip = false;
+            for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
             {
 
+                for (auto const &pair : all_clients_servers)
+                {
+                    if (pair.second->name.compare(tokens[(3 * i) + 1]) == 0)
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+                std::string name = tokens[(i * 3) + 1];
+                if(group_name.compare(name)!=0 && !skip)
+                {
+                    Client_Server *new_server = new Client_Server(serverSocket, true);
+                    std::string name = tokens[(i * 3) + 1];
+                    new_server->name = name;
+                    new_server->ip = tokens[(3 * i) + 2];
+                    new_server->port = atoi(tokens[(3 * i) + 3].c_str());
+                    server_servers[name] = new_server;
+                    std::cout << "server name: "<< new_server->name << std::endl;
+                }
+                skip = false;
+            }
+            servers_connections[serverSocket] = server_servers;
+            if(server_count<12){
+                connect_to_server_in_servers_connections(openSockets, maxfds);
+            }
+
+        }
+        else if (tokens[0].compare("KEEPALIVE") == 0)
+        {
+            int message_count = atoi(tokens[1].c_str());
+            if (message_count > 0)
+            {
+                std::string request = "*GET_MSG," + group_name + "#";
                 std::string response = send_message(serverSocket, request);
                 std::cout << response << std::endl;
             }
-            std::vector<std::string> empty;
-            stored_messages[group] = empty;
         }
-    }
-    //if server recives SEND_MSG cammnd enter this if clause.
-    else if (tokens[0].compare("SEND_MSG") == 0)
-    {
-        send_message(serverSocket,"Message recived.");
-        
-        std::string to_group = tokens[1];
-        std::string msg = buffer;
-        stored_messages[to_group].push_back(msg);
-        int count = stored_messages[to_group].size();
-
-        //check if msg is for us or not.
-        if (to_group.compare(group_name)==0){
-            std::cout<<"we recived a msg"<<std::endl;
-        }
-        else{
-            find_server_to_send_MSG(to_group,count,msg);
-        }
-    }
-    else if (tokens[0].compare("LEAVE") == 0)
-    {
-        closeClient(serverSocket, openSockets, maxfds, true);
-    }
-    else if (tokens[0].compare("STATUSREQ") == 0)
-    {
-        std::string from_group = tokens[1];
-        std::string message = "*STATUSRESP," + group_name + ',' + from_group;
-        for (auto const &pair : stored_messages)
+        else if (tokens[0].compare("GET_MSG") == 0)
         {
-            std::string group = pair.first;
-            int message_count = pair.second.size();
-            message += ',' + group + ',' + std::to_string(message_count);
+            // get group number
+            std::string group = tokens[1];
+            // std::cout << tokens[1] << tokens[2] << std::endl;
+            if (stored_messages.find(group) != stored_messages.end())
+            {
+                std::vector<std::string> requested_messages = stored_messages[group];
+                for (std::string request : requested_messages)
+                {
+
+                    std::string response = send_message(serverSocket, request);
+                    std::cout << response << std::endl;
+                }
+                std::vector<std::string> empty;
+                stored_messages[group] = empty;
+            }
         }
-        message += '#';
-        std::string response = send_message(serverSocket, message);
-        std::cout << response << std::endl;
+        //if server recives SEND_MSG cammnd enter this if clause.
+        else if (tokens[0].compare("SEND_MSG") == 0)
+        {
+            send_message(serverSocket,"Message recived.");
+            
+            std::string to_group = tokens[1];
+            std::string msg = buffer;
+            stored_messages[to_group].push_back(msg);
+            int count = stored_messages[to_group].size();
+
+            //check if msg is for us or not.
+            if (to_group.compare(group_name)==0){
+                std::cout<<"we recived a msg"<<std::endl;
+            }
+            else{
+                find_server_to_send_MSG(to_group,count,msg);
+            }
+        }
+        else if (tokens[0].compare("LEAVE") == 0)
+        {
+            closeClient(serverSocket, openSockets, maxfds, true);
+        }
+        else if (tokens[0].compare("STATUSREQ") == 0)
+        {
+            std::string from_group = tokens[1];
+            std::string message = "*STATUSRESP," + group_name + ',' + from_group;
+            for (auto const &pair : stored_messages)
+            {
+                std::string group = pair.first;
+                int message_count = pair.second.size();
+                message += ',' + group + ',' + std::to_string(message_count);
+            }
+            message += '#';
+            std::string response = send_message(serverSocket, message);
+            std::cout << response << std::endl;
+        }
+        else if (tokens[0].compare("STATUSRESP") == 0)
+        {
+            std::cout << buffer<< std::endl;
+        }
+        else
+        {
+            std::string msg= "Unknown command: ";
+            msg += buffer;
+            send_message(serverSocket,msg);
+            std::cout << "Unknown command from server:" << buffer << std::endl;
+        }
     }
-    else if (tokens[0].compare("STATUSRESP") == 0)
-    {
-        std::cout << buffer<< std::endl;
-    }
-    else
-    {
-        std::string msg= "Unknown command: ";
+    else{
+
+        std::string msg= "Unverified, please send QUERYSERVERS command first.";
         msg += buffer;
         send_message(serverSocket,msg);
-        std::cout << "Unknown command from server:" << buffer << std::endl;
+        std::cout << "Unverified server" << buffer << std::endl;
     }
 }
 
