@@ -215,7 +215,7 @@ int open_socket(int portno)
 std::string send_message(int socket, std::string req)
 {
     int nwrite = send(socket, req.c_str(), req.length(), 0);
-    std::cout<<"we send to "<<socket<<" this: "<< req<<std::endl;
+    std::cout << "we send to " << socket << " this: " << req << std::endl;
     if (nwrite < 0)
     {
         perror("send() to server failed: ");
@@ -297,7 +297,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
 
 void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 {
-    std::cout<<"Server "<<all_clients_servers[socket]->name<<" left."<<std::endl;
+    std::cout << "Server " << all_clients_servers[socket]->name << " left." << std::endl;
     if (server)
     {
         // Remove client from all the map.
@@ -305,8 +305,6 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 
         server_count--;
     }
-    // Remove client from the all_clients_servers list
-    all_clients_servers.erase(socket);
 
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
@@ -371,28 +369,30 @@ int find_server_to_send_MSG(std::string to_group, int count, std::string msg){
     return 0;
 }
 
-
-void remove_from_server_connections(std::string name){
+void remove_from_server_connections(std::string name)
+{
 
     std::vector<int> remove_outer;
     std::vector<std::string> remove_inner;
 
     for (auto const &pair : servers_connections)
     {
-        std::cout<<"\n";
-        std::cout<<pair.first<<" is connected to:";
+        std::cout << "\n";
+        std::cout << pair.first << " is connected to:";
         //run through each server that the servers we are connected to see what server they are connected
         for (auto const &pair2 : pair.second)
         {
-            std::cout<<pair2.first<<" ";
-            if(pair2.first.compare(name)==0){
-                std::cout<<"Removed :"<<name<<std::endl;
+            std::cout << pair2.first << " ";
+            if (pair2.first.compare(name) == 0)
+            {
+                std::cout << "Removed :" << name << std::endl;
                 remove_outer.push_back(pair.first);
                 remove_inner.push_back(pair2.first);
             }
-        } 
+        }
     }
-    for (int i =0; i < (int) remove_outer.size(); i++){
+    for (int i = 0; i < (int)remove_outer.size(); i++)
+    {
         servers_connections[remove_outer[i]].erase(remove_inner[i]);
     }
 }
@@ -433,7 +433,8 @@ void send_connected(int serverSocket, std::string name){
 }
 
 //connect to servers that the servers that we are connected are connected to.
-int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
+int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
+{
 
     //run through all of the servers we are connect
     for (auto const &pair : servers_connections)
@@ -448,18 +449,19 @@ int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds){
             strcpy(server_address, ip.c_str());
             char *port = new char[port_str.length() + 1];
             strcpy(port, port_str.c_str());
-            std::cout<<"ip and port for group "<< pair2.first<<" are "<< ip<< port_str<<std::endl;
+            std::cout << "ip and port for group " << pair2.first << " are " << ip << port_str << std::endl;
             //try to connect that server that we are not connected to.
-            if(connect_to_server(server_address, port, openSockets, maxfds)){
+            if (connect_to_server(server_address, port, openSockets, maxfds))
+            {
                 //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
-                std::map<std::string, Client_Server *> server_servers=pair.second;
+                std::map<std::string, Client_Server *> server_servers = pair.second;
                 server_servers.erase(pair2.first);
                 remove_from_server_connections(pair2.first);
-                servers_connections[pair.first]=server_servers;
-                std::cout<<"Removed in:"<<pair.first<<std::endl;
+                servers_connections[pair.first] = server_servers;
+                std::cout << "Removed in:" << pair.first << std::endl;
                 return 1;
             }
-        } 
+        }
     }
     return -1;
 }
@@ -562,7 +564,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
-        find_server_to_send_MSG(to_group,count,message);
+        find_server_to_send_MSG(to_group, count, message);
     }
 
     else
@@ -575,7 +577,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
 
 void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens, char *buffer)
 {
-
 
     if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
@@ -730,8 +731,6 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     }
 }
 
-
-
 //split the buffer on commas and semicommas into tokens.
 std::vector<std::string> tokenize_command(char *buffer)
 {
@@ -740,7 +739,7 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::string mini;
     bool star = false;
     bool hash = false;
-
+    printf("buffer, '%s'\n", buffer);
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -781,29 +780,25 @@ std::vector<std::string> tokenize_command(char *buffer)
         token = token.substr(0, token.size() - 1);
         tokens.push_back(token);
     }
-    
-    //if there is a star and a hash in the beging and the end the command is a server command, we add, #*# as the last token.
-    if (star && hash)
-    {
-        tokens.push_back("#*#");
-    }
 
     return tokens;
 }
 
-
 //send keepalive too all the servers we re conneceted to.
-void send_keepalive(){
+void send_keepalive()
+{
 
-    while(true){
+    while (true)
+    {
         for (auto const &pair : all_clients_servers)
-        {   
-            if(pair.second->server){
+        {
+            if (pair.second->server)
+            {
                 std::vector<std::string> messages = stored_messages[pair.second->name];
-                std::string msg ="*KEEPALIVE,"+std::to_string(messages.size())+"#";
-                std::cout<<msg<<std::endl;
+                std::string msg = "*KEEPALIVE," + std::to_string(messages.size()) + "#";
+                std::cout << msg << std::endl;
                 send_message(pair.first, msg);
-            }  
+            }
         }
         sleep(90);
     }
@@ -822,8 +817,15 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in new_connection;
     socklen_t connectionLen;
-    char buffer[1025]; // buffer for reading from clients
+    char buffer[24];          // buffer for reading from clients
+    char bytestuffBuffer[24]; // actual message
     port_addr = argv[1];
+    int messageLen; // Actual length of message received
+    bool foundHashtag;
+    size_t off;
+    char next;
+    std::string pendingRequest;
+    bool pending;
 
     if (argc != 2)
     {
@@ -866,23 +868,22 @@ int main(int argc, char *argv[])
         maxfds = std::max(maxfds, serverListenSock);
     }
 
-
     std::thread keepalivethread(send_keepalive);
 
     finished = false;
 
-    
     while (!finished)
     {
 
         // Get modifiable copy of readSockets
         readSockets = exceptSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
+        memset(bytestuffBuffer, 0, sizeof(bytestuffBuffer));
 
         // Look at sockets and see which ones have something to be read()
 
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        
+
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -912,7 +913,7 @@ int main(int argc, char *argv[])
                 printf("Client connected on server: %d\n", clientSock);
             }
             // Next, accept  any new server connections to the server on the server listening socket
-            if (FD_ISSET(serverListenSock, &readSockets)&& (server_count<16))
+            if (FD_ISSET(serverListenSock, &readSockets) && (server_count < 16))
             {
                 serverSock = accept(serverListenSock, (struct sockaddr *)&new_connection,
                                     &connectionLen);
@@ -942,7 +943,7 @@ int main(int argc, char *argv[])
                 printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
-
+            std::list<Client_Server *> disconnectedClients;
             while (n-- > 0)
             {
                 for (auto const &pair : all_clients_servers)
@@ -953,38 +954,96 @@ int main(int argc, char *argv[])
                     if (FD_ISSET(client->sock, &readSockets))
                     {
                         // recv() == 0 means client has closed connection
-                        if (recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
+                        if (recv(client->sock, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0)
                         {
-                            std::cout<<"Client/Server closed connection: %d"<< client->sock<<"\n"<<std::endl;
+                            std::cout << "Client/Server closed connection: %d" << client->sock << "\n"
+                                      << std::endl;
 
-                            close(client->sock);
-                            // TODO: close servers
+                            disconnectedClients.push_back(client);
                             closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
                         // We don't check for -1 (nothing received) because select()
                         // only triggers if there is something on the socket for us.
                         else
                         {
-                            std::cout<<"Buffer "<<client->sock<<" send: "<<buffer<<std::endl;
-                            std::vector<std::string> tokens = tokenize_command(buffer);
-
-                            if (tokens.back().compare("#*#") == 0)
+                            // memset(buffer, 0, sizeof(buffer));
+                            off = 0;
+                            foundHashtag = false;
+                            char *p;
+                            if (!pending)
                             {
-                                tokens.pop_back();
-                                serverCommand(client->sock, &openSockets, &maxfds, tokens, buffer);
+                                pendingRequest = "";
+                            }
+
+                            pending = false;
+
+                            while (!foundHashtag)
+                            {
+                                // printf("peek '%s'\n", buffer);
+
+                                p = strchr(buffer + off, '#');
+
+                                // bytestuffing...
+                                if (p == NULL)
+                                {
+
+                                    pending = true;
+                                    foundHashtag = true;
+                                }
+                                else
+                                {
+                                    next = *(p + 1);
+
+                                    if (next != '#')
+                                    {
+                                        foundHashtag = true;
+                                    }
+                                    else
+                                    {
+                                        p += 2;
+                                        off = p - buffer;
+                                    }
+                                }
+                            }
+
+                            if (p != NULL)
+                            {
+                                // copy everything until the first hashtag
+                                recv(client->sock, bytestuffBuffer, p - buffer + 1, MSG_DONTWAIT);
                             }
                             else
                             {
-                                clientCommand(client->sock, &openSockets, &maxfds, tokens, buffer);
+                                // if there is no hashtag, copy the whole buffer and keep reding. This happens when the message is longer than the buffer
+                                recv(client->sock, bytestuffBuffer, sizeof(bytestuffBuffer), MSG_DONTWAIT);
+                            }
+                            printf("byteBuffer: '%s'\n", bytestuffBuffer);
+                            //printf("byteBuff '%s'\n", bytestuffBuffer);
+                            pendingRequest.append(bytestuffBuffer);
+                            // if the whole message has been read
+                            if (!pending)
+                            {
+                                char *long_req = new char[pendingRequest.length() + 1];
+
+                                strcpy(long_req, pendingRequest.c_str());
+
+                                std::vector<std::string> tokens = tokenize_command(long_req);
+
+                                if (client->server)
+                                {
+                                    serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
+                                }
+                                else
+                                {
+                                    clientCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
+                                }
                             }
                         }
-                        break;
+                        // Remove client from the clients list
+                        for (auto const &c : disconnectedClients)
+                            all_clients_servers.erase(c->sock);
                     }
                 }
             }
-            
-            
         }
     }
-    
 }
