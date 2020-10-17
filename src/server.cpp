@@ -296,8 +296,6 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
         stored_messages[all_clients_servers[socket]->name];
         server_count--;
     }
-    // Remove client from the all_clients_servers list
-    all_clients_servers.erase(socket);
 
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
@@ -650,12 +648,13 @@ std::vector<std::string> get_message(char *buffer)
     std::string mini;
     bool star = false;
     bool hash = false;
-
+    printf("buffer, '%s'\n", buffer);
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
     while (std::getline(stream, token, ','))
     {
+        // std::cout << token << std::endl;
         //check if there is star in the begining of the command
         if (count == 0)
         {
@@ -692,11 +691,6 @@ std::vector<std::string> get_message(char *buffer)
         tokens.push_back(token);
     }
 
-    if (star && hash)
-    {
-        tokens.push_back("#*#");
-    }
-
     return tokens;
 }
 
@@ -713,8 +707,15 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in new_connection;
     socklen_t connectionLen;
-    char buffer[1025]; // buffer for reading from clients
+    char buffer[24];          // buffer for reading from clients
+    char bytestuffBuffer[24]; // actual message
     port_addr = argv[1];
+    int messageLen; // Actual length of message received
+    bool foundHashtag;
+    size_t off;
+    char next;
+    std::string pendingRequest;
+    bool pending;
 
     if (argc != 2)
     {
@@ -765,6 +766,7 @@ int main(int argc, char *argv[])
         // Get modifiable copy of readSockets
         readSockets = exceptSockets = openSockets;
         memset(buffer, 0, sizeof(buffer));
+        memset(bytestuffBuffer, 0, sizeof(bytestuffBuffer));
 
         // Look at sockets and see which ones have something to be read()
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
@@ -827,6 +829,7 @@ int main(int argc, char *argv[])
                 printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
+            std::list<Client_Server *> disconnectedClients;
             while (n-- > 0)
             {
                 for (auto const &pair : all_clients_servers)
@@ -837,32 +840,92 @@ int main(int argc, char *argv[])
                     if (FD_ISSET(client->sock, &readSockets))
                     {
                         // recv() == 0 means client has closed connection
-                        if (recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
+                        if (recv(client->sock, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0)
                         {
                             printf("Client/Server closed connection: %d", client->sock);
 
-                            close(client->sock);
-                            // TODO: close servers
+                            disconnectedClients.push_back(client);
                             closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
                         // We don't check for -1 (nothing received) because select()
                         // only triggers if there is something on the socket for us.
                         else
                         {
-
-                            std::vector<std::string> tokens = get_message(buffer);
-
-                            if (tokens.back().compare("#*#") == 0)
+                            // memset(buffer, 0, sizeof(buffer));
+                            off = 0;
+                            foundHashtag = false;
+                            char *p;
+                            if (!pending)
                             {
-                                tokens.pop_back();
-                                serverCommand(client->sock, &openSockets, &maxfds, tokens, buffer);
+                                pendingRequest = "";
+                            }
+
+                            pending = false;
+
+                            while (!foundHashtag)
+                            {
+                                // printf("peek '%s'\n", buffer);
+
+                                p = strchr(buffer + off, '#');
+
+                                // bytestuffing...
+                                if (p == NULL)
+                                {
+
+                                    pending = true;
+                                    foundHashtag = true;
+                                }
+                                else
+                                {
+                                    next = *(p + 1);
+
+                                    if (next != '#')
+                                    {
+                                        foundHashtag = true;
+                                    }
+                                    else
+                                    {
+                                        p += 2;
+                                        off = p - buffer;
+                                    }
+                                }
+                            }
+
+                            if (p != NULL)
+                            {
+                                // copy everything until the first hashtag
+                                recv(client->sock, bytestuffBuffer, p - buffer + 1, MSG_DONTWAIT);
                             }
                             else
                             {
-                                clientCommand(client->sock, &openSockets, &maxfds, tokens, buffer);
+                                // if there is no hashtag, copy the whole buffer and keep reding. This happens when the message is longer than the buffer
+                                recv(client->sock, bytestuffBuffer, sizeof(bytestuffBuffer), MSG_DONTWAIT);
+                            }
+                            printf("byteBuffer: '%s'\n", bytestuffBuffer);
+                            //printf("byteBuff '%s'\n", bytestuffBuffer);
+                            pendingRequest.append(bytestuffBuffer);
+                            // if the whole message has been read
+                            if (!pending)
+                            {
+                                char *long_req = new char[pendingRequest.length() + 1];
+
+                                strcpy(long_req, pendingRequest.c_str());
+
+                                std::vector<std::string> tokens = get_message(long_req);
+
+                                if (client->server)
+                                {
+                                    serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
+                                }
+                                else
+                                {
+                                    clientCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
+                                }
                             }
                         }
-                        break;
+                        // Remove client from the clients list
+                        for (auto const &c : disconnectedClients)
+                            all_clients_servers.erase(c->sock);
                     }
                 }
             }
