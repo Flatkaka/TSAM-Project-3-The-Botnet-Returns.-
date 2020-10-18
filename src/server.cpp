@@ -647,6 +647,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 all_clients_servers[serverSocket]->name = tokens[1];
             }
+            all_clients_servers[serverSocket]->port = atoi(tokens[3].c_str());
 
             std::map<std::string, Client_Server *> server_servers;
             bool skip = false;
@@ -663,13 +664,9 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                         break;
                     }
                 }
-                // do not add us to the list.
-                if (group_name.compare(tokens[(3 * i) + 1]) == 0)
-                {
-                    skip = true;
-                }
                 std::string name = tokens[(i * 3) + 1];
-                if (group_name.compare(name) != 0 && !skip)
+                std::string address = tokens[(i * 3) + 2];
+                if (group_name.compare(name) != 0 && server_addr.compare(address) != 0 && !skip)
                 {
                     Client_Server *new_server = new Client_Server(serverSocket, true);
                     std::string name = tokens[(i * 3) + 1];
@@ -965,7 +962,8 @@ int main(int argc, char *argv[])
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-                new_server->port = htons(new_connection.sin_port);
+
+                new_server->port = -1;
                 all_clients_servers[serverSock] = new_server;
 
                 // increase number of servers connected
@@ -1052,7 +1050,7 @@ int main(int argc, char *argv[])
                                 // if there is no hashtag, copy the whole buffer and keep reding. This happens when the message is longer than the buffer
                                 recv(client->sock, bytestuffBuffer, sizeof(bytestuffBuffer), MSG_DONTWAIT);
                             }
-                            printf("byteBuffer: '%s'\n", bytestuffBuffer);
+
                             //printf("byteBuff '%s'\n", bytestuffBuffer);
 
                             pendingRequest.append(bytestuffBuffer);
