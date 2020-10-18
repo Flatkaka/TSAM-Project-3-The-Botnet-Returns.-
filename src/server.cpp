@@ -147,9 +147,10 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-std::string server_addr = "0.0.0.0";//getIP();
+std::string server_addr = "0.0.0.0";
+// std::string server_addr = getIP();
 std::string port_addr;
-std::string group_name = "P3_GROUP_1000"; // global variable storing the name of our group
+std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
 
 // Open socket for specified port.
@@ -545,7 +546,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         int count = 1;
         for (auto const &pair : all_clients_servers)
         {
-            if (pair.second->server)
+            if (pair.second->server && pair.second->name.empty() == false)
             {
                 msg += std::to_string(count) + ":" + pair.second->name + "," + pair.second->ip + "," + std::to_string(pair.second->port) + "\n";
                 count += 1;
@@ -844,7 +845,6 @@ int main(int argc, char *argv[])
     char buffer[1000];          // buffer for reading from clients
     char bytestuffBuffer[1000]; // actual message
     port_addr = argv[1];
-    int messageLen; // Actual length of message received
     bool foundHashtag;
     size_t off;
     char next;
