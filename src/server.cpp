@@ -394,17 +394,17 @@ void remove_from_server_connections(std::string name)
     std::vector<int> remove_outer;
     std::vector<std::string> remove_inner;
 
-    for (auto const &pair : servers_connections)
+    for (auto const &pair : all_clients_servers)
     {
         std::cout << "\n";
         std::cout << pair.first << " is connected to:";
         //run through each server that the servers we are connected to see what server they are connected
-        for (auto const &pair2 : pair.second)
+        for (auto const &pair2 : servers_connections[pair.first])
         {
             std::cout << pair2.first << " ";
             if (pair2.first.compare(name) == 0)
             {
-                std::cout << "Removed :" << name << std::endl;
+                std::cout << "\n Removed :" << name <<" from " <<pair.second->name<<std::endl;
                 remove_outer.push_back(pair.first);
                 remove_inner.push_back(pair2.first);
             }
@@ -429,7 +429,7 @@ void send_connected(int serverSocket, std::string name)
             server.push_back(pair.second->ip);
             server.push_back(std::to_string(pair.second->port));
             all_servers.insert(server);
-            for (auto const &pair2 : servers_connections[pair.first])
+            for (auto const &pair2 :servers_connections[pair.first])
             {
                 std::vector<std::string> server;
                 server.push_back(pair2.second->name);
@@ -451,37 +451,52 @@ void send_connected(int serverSocket, std::string name)
 }
 
 //connect to servers that the servers that we are connected are connected to.
-int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
+void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
 {
 
     //run through all of the servers we are connect
-    for (auto const &pair : servers_connections)
-    {
-        //run through each server that the servers we are connected to see what server they are connected
-        for (auto const &pair2 : pair.second)
-        {
-            //change string to char.
-            std::string ip = pair2.second->ip;
-            std::string port_str = std::to_string(pair2.second->port);
-            char *server_address = new char[ip.length() + 1];
-            strcpy(server_address, ip.c_str());
-            char *port = new char[port_str.length() + 1];
-            strcpy(port, port_str.c_str());
-            std::cout << "ip and port for group " << pair2.first << " are " << ip << port_str << std::endl;
-            //try to connect that server that we are not connected to.
-            if (connect_to_server(server_address, port, openSockets, maxfds))
+    while(true){
+
+        if(server_count < 10){
+            bool sent = false;
+
+            for (auto const &pair : servers_connections)
             {
-                //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
-                std::map<std::string, Client_Server *> server_servers = pair.second;
-                server_servers.erase(pair2.first);
-                remove_from_server_connections(pair2.first);
-                servers_connections[pair.first] = server_servers;
-                std::cout << "Removed in:" << pair.first << std::endl;
-                return 1;
+                //run through each server that the servers we are connected to see what server they are connected
+                for (auto const &pair2 : pair.second)
+                {
+                    //change string to char.
+                    std::string ip = pair2.second->ip;
+                    std::string port_str = std::to_string(pair2.second->port);
+                    char *server_address = new char[ip.length() + 1];
+                    strcpy(server_address, ip.c_str());
+                    char *port = new char[port_str.length() + 1];
+                    strcpy(port, port_str.c_str());
+                    std::cout << "ip and port for group " << pair2.first << " are " << ip << " "<< port_str << std::endl;
+                    //try to connect that server that we are not connected to.
+                    if (connect_to_server(server_address, port, openSockets, maxfds))
+                    {
+                        //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
+
+                        std::cout<<"Sending to server through friends: "<<pair2.first<<std::endl;
+                        std::map<std::string, Client_Server *> server_servers = pair.second;
+                        server_servers.erase(pair2.first);
+                        remove_from_server_connections(pair2.first);
+                        servers_connections[pair.first] = server_servers;
+                        std::cout << "Removed in:" << pair.first << std::endl;
+                        
+                        sent = true;
+                        break;
+                    }
+                }
+                if (sent)break;
             }
+            
         }
+        sleep(60);
+            
     }
-    return -1;
+    
 }
 
 std::string extract_msg_string(std::string message, int max)
@@ -670,15 +685,12 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     new_server->ip = tokens[(3 * i) + 2];
                     new_server->port = atoi(tokens[(3 * i) + 3].c_str());
                     server_servers[name] = new_server;
-                    std::cout << "server name: " << new_server->name << std::endl;
+                    std::cout << "server name: " << new_server->name << "is connected to"<< serverSocket << std::endl;
                 }
                 skip = false;
             }
             servers_connections[serverSocket] = server_servers;
-            if (server_count < 12)
-            {
-                connect_to_server_in_servers_connections(openSockets, maxfds);
-            }
+            
         }
         else if (tokens[0].compare("KEEPALIVE") == 0)
         {
@@ -896,6 +908,7 @@ int main(int argc, char *argv[])
     }
 
     std::thread keepalivethread(send_keepalive);
+    std::thread find_other_servers( connect_to_server_in_servers_connections, &openSockets, &maxfds);
 
     finished = false;
 
