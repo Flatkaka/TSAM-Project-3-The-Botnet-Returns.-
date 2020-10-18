@@ -280,8 +280,15 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
 
     if (connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        printf("Failed to open socket to server: %s\n", address);
-        perror("Connect failed: ");
+        // EINPROGRESS means that the connection is still being setup. Typically this
+        // only occurs with non-blocking sockets. (The serverSocket above is explicitly
+        // not in non-blocking mode, so this check here is just an example of how to
+        // handle this properly.)
+        if (errno != EINPROGRESS)
+        {
+            printf("Failed to open socket to server: %s\n", port);
+            perror("Connect failed: ");
+        }
         return -1;
     }
 
@@ -496,7 +503,7 @@ std::string extract_msg_string(std::string message, int max)
         }
         count += 1;
     }
-    msg = msg.substr(0,msg.size()-1);
+    msg = msg.substr(0, msg.size() - 1);
     msg = replace(msg, "##", "#");
     msg = replace(msg, "**", "*");
     return msg;
@@ -519,10 +526,8 @@ std::string extract_msg(char *buffer, int max)
         }
         count += 1;
     }
-    msg = msg.substr(0,msg.size()-1);
+    msg = msg.substr(0, msg.size() - 1);
 
-    msg = replace(msg, "#", "##");
-    msg = replace(msg, "*", "**");
     return msg;
 }
 
@@ -576,8 +581,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         std::string from_group = tokens[2];
-        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2)+"#";
-        std::cout<<"message that we save:  "<<message<<std::endl;
+        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
+        std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
@@ -632,7 +637,6 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     {
                         server_addr = tokens[(3 * i) + 2];
                     }
-                    
                 }
                 send_connected(serverSocket, tokens[1]);
             }
@@ -659,7 +663,8 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     }
                 }
                 std::string name = tokens[(i * 3) + 1];
-                if (group_name.compare(name) != 0 && !skip)
+                std::string address = tokens[(i * 3) + 2];
+                if (group_name.compare(name) != 0 && server_addr.compare(address) != 0 && !skip)
                 {
                     Client_Server *new_server = new Client_Server(serverSocket, true);
                     std::string name = tokens[(i * 3) + 1];
