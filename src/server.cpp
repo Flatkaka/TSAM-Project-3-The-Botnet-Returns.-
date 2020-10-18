@@ -218,6 +218,21 @@ std::string send_message(int socket, std::string req)
     return "success";
 }
 
+std::string replace(std::string input, std::string from, std::string to)
+{
+    std::cout << from << std::endl;
+    std::cout << to << std::endl;
+    size_t pos = 0;
+    pos = input.find(from.c_str(), pos);
+    while (pos != std::string::npos)
+    {
+        input.replace(pos, sizeof(to.c_str()), to.c_str());
+        pos += sizeof(to.c_str());
+        pos = input.find(from.c_str(), pos);
+    }
+    return input;
+}
+
 int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfds)
 {
     struct addrinfo hints, *svr;  // Network host entry for server
@@ -440,14 +455,16 @@ std::string extract_msg_string(std::string message, int max)
     {
         if (count >= max)
         {
-
             msg += token;
         }
         count += 1;
     }
 
+    msg = replace(msg, "##", "#");
+    msg = replace(msg, "**", "*");
     return msg;
 }
+
 std::string extract_msg(char *buffer, int max)
 {
 
@@ -466,6 +483,9 @@ std::string extract_msg(char *buffer, int max)
         }
         count += 1;
     }
+
+    msg = replace(msg, "#", "##");
+    msg = replace(msg, "*", "**");
 
     return msg;
 }
@@ -520,7 +540,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         std::string from_group = tokens[2];
-        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
+        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg_string(buffer, 2) + "#";
 
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
