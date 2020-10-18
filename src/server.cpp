@@ -147,10 +147,10 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-std::string server_addr = "0.0.0.0";
-// std::string server_addr = getIP();
+// std::string server_addr = "0.0.0.0";
+std::string server_addr = getIP();
 std::string port_addr;
-std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
+std::string group_name = "P3_GROUP_1test"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
 
 // Open socket for specified port.
@@ -641,6 +641,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 all_clients_servers[serverSocket]->name = tokens[1];
             }
+            all_clients_servers[serverSocket]->port = stoi(tokens[3]);
 
             std::map<std::string, Client_Server *> server_servers;
             bool skip = false;
@@ -656,10 +657,6 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                         skip = true;
                         break;
                     }
-                }
-                // do not add us to the list.
-                if(group_name.compare(tokens[(3*i)+1])==0){
-                    skip = true;
                 }
                 std::string name = tokens[(i * 3) + 1];
                 if (group_name.compare(name) != 0 && !skip)
@@ -958,7 +955,8 @@ int main(int argc, char *argv[])
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-                new_server->port = new_connection.sin_port;
+
+                new_server->port = -1;
                 all_clients_servers[serverSock] = new_server;
 
                 // increase number of servers connected
@@ -1045,7 +1043,7 @@ int main(int argc, char *argv[])
                                 // if there is no hashtag, copy the whole buffer and keep reding. This happens when the message is longer than the buffer
                                 recv(client->sock, bytestuffBuffer, sizeof(bytestuffBuffer), MSG_DONTWAIT);
                             }
-                            printf("byteBuffer: '%s'\n", bytestuffBuffer);
+
                             //printf("byteBuff '%s'\n", bytestuffBuffer);
 
                             pendingRequest.append(bytestuffBuffer);
