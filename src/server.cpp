@@ -435,7 +435,7 @@ void send_connected(int serverSocket, std::string name)
     }
     for (auto e : all_servers)
     {
-        if (e[0].compare(name) != 0 && e[0].empty() == false)
+        if (e[0].empty() == false)
         {
             msg += ";" + e[0] + "," + e[1] + "," + e[2];
         }
