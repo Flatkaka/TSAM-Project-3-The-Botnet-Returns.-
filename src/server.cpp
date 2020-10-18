@@ -147,6 +147,7 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
+// std::string server_addr = "0.0.0.0";
 std::string server_addr = getIP();
 std::string port_addr;
 std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
@@ -502,7 +503,7 @@ std::string extract_msg_string(std::string message, int max)
         }
         count += 1;
     }
-
+    msg = msg.substr(0, msg.size() - 1);
     msg = replace(msg, "##", "#");
     msg = replace(msg, "**", "*");
     return msg;
@@ -513,7 +514,6 @@ std::string extract_msg(char *buffer, int max)
 
     std::string token;
     std::string msg;
-
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -526,10 +526,10 @@ std::string extract_msg(char *buffer, int max)
         }
         count += 1;
     }
+    msg = msg.substr(0, msg.size() - 1);
 
     msg = replace(msg, "#", "##");
     msg = replace(msg, "*", "**");
-
     return msg;
 }
 
@@ -552,7 +552,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         int count = 1;
         for (auto const &pair : all_clients_servers)
         {
-            if (pair.second->server)
+            if (pair.second->server && pair.second->name.empty() == false)
             {
                 msg += std::to_string(count) + ":" + pair.second->name + "," + pair.second->ip + "," + std::to_string(pair.second->port) + "\n";
                 count += 1;
@@ -583,8 +583,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         std::string from_group = tokens[2];
-        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg_string(buffer, 2) + "#";
-
+        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
+        std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
@@ -662,6 +662,11 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                         skip = true;
                         break;
                     }
+                }
+                // do not add us to the list.
+                if (group_name.compare(tokens[(3 * i) + 1]) == 0)
+                {
+                    skip = true;
                 }
                 std::string name = tokens[(i * 3) + 1];
                 if (group_name.compare(name) != 0 && !skip)

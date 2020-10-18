@@ -22,6 +22,8 @@
 #include <vector>
 #include <thread>
 
+#include <time.h>
+
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -29,7 +31,7 @@
 
 // Threaded function for handling responss from server
 
-void listenServer(int serverSocket)
+void listenServer(int serverSocket,struct tm * timeinfo)
 {
     int nread;                                  // Bytes read from socket
     char buffer[1025];                          // Buffer for reading input
@@ -46,6 +48,7 @@ void listenServer(int serverSocket)
        }
        else if(nread > 0)
        {
+          printf("At %sWe recived :\n",asctime(timeinfo));
           printf("%s\n", buffer);
        }
        printf("here\n");
@@ -61,6 +64,10 @@ int main(int argc, char* argv[])
    char buffer[1025];                        // buffer for writing to server
    bool finished;                   
    int set = 1;                              // Toggle for setsockopt
+   time_t rawtime;
+   struct tm * timeinfo;
+   time(&rawtime);
+   timeinfo = localtime(&rawtime);
 
    if(argc != 3)
    {
@@ -110,7 +117,7 @@ int main(int argc, char* argv[])
    }
 
     // Listen and print replies from server
-   std::thread serverThread(listenServer, serverSocket);
+   std::thread serverThread(listenServer, serverSocket, timeinfo);
 
    finished = false;
    std::string args_from_user;
@@ -125,7 +132,8 @@ int main(int argc, char* argv[])
         }
         args_from_user.substr(0, args_from_user.size()-1);
         args_from_user="*"+args_from_user+"#";
-
+        printf("At %s We sent :\n",asctime(timeinfo));
+        printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
         nwrite = send(serverSocket, buffer, strlen(buffer),0);
 
