@@ -55,6 +55,21 @@ void listenServer(int serverSocket, struct tm *timeinfo)
     }
 }
 
+std::string replace(std::string input, std::string from, std::string to)
+{
+    std::cout << from << std::endl;
+    std::cout << to << std::endl;
+    size_t pos = 0;
+    pos = input.find(from.c_str(), pos);
+    while (pos != std::string::npos)
+    {
+        input.replace(pos, sizeof(to.c_str()), to.c_str());
+        pos += sizeof(to.c_str());
+        pos = input.find(from.c_str(), pos);
+    }
+    return input;
+}
+
 int main(int argc, char *argv[])
 {
     struct addrinfo hints, *svr;  // Network host entry for server
@@ -141,7 +156,10 @@ int main(int argc, char *argv[])
         printf("At %s We sent :\n", asctime(timeinfo));
         printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
-        nwrite = send(serverSocket, buffer, strlen(buffer), 0);
+        std::string msg = buffer;
+        msg = replace(msg, "*", "**");
+        msg = replace(msg, "#", "##");
+        nwrite = send(serverSocket, msg.c_str(), msg.length(), 0);
 
         if (nwrite == -1)
         {
