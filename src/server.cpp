@@ -496,7 +496,7 @@ std::string extract_msg_string(std::string message, int max)
         }
         count += 1;
     }
-
+    msg = msg.substr(0,msg.size()-1);
     msg = replace(msg, "##", "#");
     msg = replace(msg, "**", "*");
     return msg;
@@ -507,7 +507,6 @@ std::string extract_msg(char *buffer, int max)
 
     std::string token;
     std::string msg;
-
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -520,10 +519,10 @@ std::string extract_msg(char *buffer, int max)
         }
         count += 1;
     }
+    msg = msg.substr(0,msg.size()-1);
 
     msg = replace(msg, "#", "##");
     msg = replace(msg, "*", "**");
-
     return msg;
 }
 
@@ -577,8 +576,8 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         std::string from_group = tokens[2];
-        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg_string(buffer, 2) + "#";
-
+        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2)+"#";
+        std::cout<<"message that we save:  "<<message<<std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
@@ -657,6 +656,10 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                         skip = true;
                         break;
                     }
+                }
+                // do not add us to the list.
+                if(group_name.compare(tokens[(3*i)+1])==0){
+                    skip = true;
                 }
                 std::string name = tokens[(i * 3) + 1];
                 if (group_name.compare(name) != 0 && !skip)
