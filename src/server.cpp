@@ -641,7 +641,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 all_clients_servers[serverSocket]->name = tokens[1];
             }
-            all_clients_servers[serverSocket]->port = stoi(tokens[3]);
+            all_clients_servers[serverSocket]->port = atoi(tokens[3].c_str());
 
             std::map<std::string, Client_Server *> server_servers;
             bool skip = false;
