@@ -48,7 +48,7 @@ void listenServer(int serverSocket,struct tm * timeinfo)
        }
        else if(nread > 0)
        {
-          printf("At %sWe recived :\n",asctime(timeinfo));
+          std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We recived : \033[0m"<<std::endl;
           printf("%s\n", buffer);
        }
        printf("here\n");
@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
         }
         args_from_user.substr(0, args_from_user.size()-1);
         args_from_user="*"+args_from_user+"#";
-        printf("At %s We sent :\n",asctime(timeinfo));
+        std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We sent : \033[0m"<<std::endl;
         printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
         nwrite = send(serverSocket, buffer, strlen(buffer),0);

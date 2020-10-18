@@ -150,7 +150,7 @@ std::map<int, std::map<std::string, Client_Server *>> servers_connections; //loo
 // std::string server_addr = "0.0.0.0";
 std::string server_addr = getIP();
 std::string port_addr;
-std::string group_name = "P3_GROUP_1test"; // global variable storing the name of our group
+std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
 
 // Open socket for specified port.
