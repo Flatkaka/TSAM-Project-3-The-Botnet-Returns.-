@@ -583,22 +583,28 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
         all_clients_servers[serverSocket]->name = tokens[1];
         all_clients_servers[serverSocket]->verified=true;
+
+        //if we have not sent queryserver before we send it again
         if(!all_clients_servers[serverSocket]->sent){
+            all_clients_servers[serverSocket]->sent =true;
             std::string req = "*QUERYSERVERS," + group_name + '#';
             send_message(serverSocket, req);
         }
-
+        
+        //this is for when we are portfowrading and don't know our serveraddress.
         if(server_addr.compare("0.0.0.0")!=0){
-
 
             send_connected(serverSocket, tokens[1]);
         }
 
         
     }
+    //check if the servers has sent first QUERYSERVERS
     else if(all_clients_servers[serverSocket]->verified){
+
         if (tokens[0].compare("CONNECTED") == 0)
         {
+            //if we have not still found the server address, we can access it now and send queryservice.
             if(server_addr.compare("0.0.0.0")==0){
                 for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
                 {
@@ -610,15 +616,19 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     send_connected(serverSocket, tokens[1]);
                 }
             }
+            //if the server has the wrong name
             if (all_clients_servers[serverSocket]->name.compare(tokens[1]) != 0)
             {
                 all_clients_servers[serverSocket]->name=tokens[1];
             }
+
             std::map<std::string, Client_Server *> server_servers;
             bool skip = false;
+
+            //let's itterrate through all the servers that we were sent with the CONNECTED command.
             for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
             {
-
+                //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
                     if (pair.second->name.compare(tokens[(3 * i) + 1]) == 0)
@@ -677,7 +687,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         //if server recives SEND_MSG cammnd enter this if clause.
         else if (tokens[0].compare("SEND_MSG") == 0)
         {
-            send_message(serverSocket,"Message recived.");
+            // send_message(serverSocket,"Message recived.");
             
             std::string to_group = tokens[1];
             std::string msg = buffer;
@@ -716,18 +726,14 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         }
         else
         {
-            std::string msg= "Unknown command: ";
-            msg += buffer;
-            send_message(serverSocket,msg);
+
             std::cout << "Unknown command from server:" << buffer << std::endl;
         }
     }
     else{
 
-        std::string msg= "Unverified, please send QUERYSERVERS command first.";
-        msg += buffer;
-        send_message(serverSocket,msg);
-        std::cout << "Unverified server" << buffer << std::endl;
+
+        std::cout << "Unverified server" <<buffer<< std::endl;
     }
 }
 
@@ -737,9 +743,9 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
-    bool star = false;
-    bool hash = false;
-    printf("buffer, '%s'\n", buffer);
+
+
+    printf("Tokenized buffer, '%s'\n", buffer);
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -751,8 +757,6 @@ std::vector<std::string> tokenize_command(char *buffer)
             char firstletter = token.front();
             if (firstletter == '*')
             {
-
-                star = true;
                 token = token.substr(1);
                 ;
             }
@@ -775,7 +779,6 @@ std::vector<std::string> tokenize_command(char *buffer)
     if (lastletter == '#')
     {
 
-        hash = true;
         tokens.pop_back();
         token = token.substr(0, token.size() - 1);
         tokens.push_back(token);
@@ -817,8 +820,8 @@ int main(int argc, char *argv[])
     int maxfds;           // Passed to select() as max fd in set
     struct sockaddr_in new_connection;
     socklen_t connectionLen;
-    char buffer[24];          // buffer for reading from clients
-    char bytestuffBuffer[24]; // actual message
+    char buffer[1000];          // buffer for reading from clients
+    char bytestuffBuffer[1000]; // actual message
     port_addr = argv[1];
     int messageLen; // Actual length of message received
     bool foundHashtag;
@@ -826,7 +829,7 @@ int main(int argc, char *argv[])
     char next;
     std::string pendingRequest;
     bool pending;
-
+    // group_name+=argv[1];
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -944,6 +947,7 @@ int main(int argc, char *argv[])
             }
             // Now check for commands from all_clients_servers
             std::list<Client_Server *> disconnectedClients;
+            pendingRequest="";
             while (n-- > 0)
             {
                 for (auto const &pair : all_clients_servers)
@@ -967,6 +971,7 @@ int main(int argc, char *argv[])
                         else
                         {
                             // memset(buffer, 0, sizeof(buffer));
+                            printf("Whole buffer: '%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
                             char *p;
@@ -1018,7 +1023,12 @@ int main(int argc, char *argv[])
                             }
                             printf("byteBuffer: '%s'\n", bytestuffBuffer);
                             //printf("byteBuff '%s'\n", bytestuffBuffer);
+                            
                             pendingRequest.append(bytestuffBuffer);
+                            
+                                  
+                            
+                            
                             // if the whole message has been read
                             if (!pending)
                             {
@@ -1038,11 +1048,12 @@ int main(int argc, char *argv[])
                                 }
                             }
                         }
-                        // Remove client from the clients list
-                        for (auto const &c : disconnectedClients)
-                            all_clients_servers.erase(c->sock);
+                       
                     }
                 }
+                 // Remove client from the clients list
+                        for (auto const &c : disconnectedClients)
+                            all_clients_servers.erase(c->sock);
             }
         }
     }

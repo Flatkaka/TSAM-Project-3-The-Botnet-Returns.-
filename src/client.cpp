@@ -113,19 +113,27 @@ int main(int argc, char* argv[])
    std::thread serverThread(listenServer, serverSocket);
 
    finished = false;
+   std::string args_from_user;
+    
    while(!finished)
-   {
-       bzero(buffer, sizeof(buffer));
+    {
+        bzero(buffer, sizeof(buffer));
+        getline(std::cin, args_from_user);
+        while(args_from_user.compare("")==0)
+        {
+            getline(std::cin, args_from_user);
+        }
+        args_from_user.erase(std::remove_if(args_from_user.begin(), args_from_user.end(), ::isspace), args_from_user.end());
+        args_from_user="*"+args_from_user+"#";
 
-       fgets(buffer, sizeof(buffer), stdin);
+        strcpy(buffer, args_from_user.c_str());
+        nwrite = send(serverSocket, buffer, strlen(buffer),0);
 
-       nwrite = send(serverSocket, buffer, strlen(buffer),0);
-
-       if(nwrite  == -1)
-       {
-           perror("send() to server failed: ");
-           finished = true;
-       }
+        if(nwrite  == -1)
+        {
+            perror("send() to server failed: ");
+            finished = true;
+        }
 
    }
 }
