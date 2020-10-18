@@ -843,7 +843,6 @@ int main(int argc, char *argv[])
     char buffer[1000];          // buffer for reading from clients
     char bytestuffBuffer[1000]; // actual message
     port_addr = argv[1];
-    int messageLen; // Actual length of message received
     bool foundHashtag;
     size_t off;
     char next;
