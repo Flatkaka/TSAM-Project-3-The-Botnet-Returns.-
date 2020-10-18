@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
         {
             getline(std::cin, args_from_user);
         }
-        args_from_user.erase(std::remove_if(args_from_user.begin(), args_from_user.end(), ::isspace), args_from_user.end());
+        args_from_user.substr(0, args_from_user.size()-1);
         args_from_user="*"+args_from_user+"#";
 
         strcpy(buffer, args_from_user.c_str());

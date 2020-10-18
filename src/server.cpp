@@ -147,9 +147,9 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-std::string server_addr = getIP();
+std::string server_addr = "0.0.0.0";//getIP();
 std::string port_addr;
-std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
+std::string group_name = "P3_GROUP_1000"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
 
 // Open socket for specified port.
@@ -632,8 +632,9 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     {
                         server_addr = tokens[(3 * i) + 2];
                     }
-                    send_connected(serverSocket, tokens[1]);
+                    
                 }
+                send_connected(serverSocket, tokens[1]);
             }
             //if the server has the wrong name
             if (all_clients_servers[serverSocket]->name.compare(tokens[1]) != 0)
