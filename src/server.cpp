@@ -279,8 +279,15 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
 
     if (connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        printf("Failed to open socket to server: %s\n", address);
-        perror("Connect failed: ");
+        // EINPROGRESS means that the connection is still being setup. Typically this
+        // only occurs with non-blocking sockets. (The serverSocket above is explicitly
+        // not in non-blocking mode, so this check here is just an example of how to
+        // handle this properly.)
+        if (errno != EINPROGRESS)
+        {
+            printf("Failed to open socket to server: %s\n", port);
+            perror("Connect failed: ");
+        }
         return -1;
     }
 
@@ -953,7 +960,7 @@ int main(int argc, char *argv[])
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-                new_server->port = new_connection.sin_port;
+                new_server->port = htons(new_connection.sin_port);
                 all_clients_servers[serverSock] = new_server;
 
                 // increase number of servers connected

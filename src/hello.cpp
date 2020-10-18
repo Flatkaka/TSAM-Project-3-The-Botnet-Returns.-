@@ -1,6 +1,7 @@
 // Your First C++ Program
 
 #include <iostream>
+#include <arpa/inet.h>
 
 std::string replace(std::string input, std::string from, std::string to)
 {
@@ -19,28 +20,7 @@ std::string replace(std::string input, std::string from, std::string to)
 
 int main()
 {
-  std::string msg = "hallo hashtag# her er lika stjarna #";
 
-  // size_t hash_pos = 0;
-  // hash_pos = msg.find("#", hash_pos);
-  // while (hash_pos != std::string::npos)
-  // {
-  //   msg.replace(hash_pos, sizeof("##"), "##");
-  //   hash_pos += sizeof("##");
-  //   hash_pos = msg.find("#", hash_pos);
-  // }
-
-  // size_t star_pos = 0;
-  // star_pos = msg.find("*", star_pos);
-  // while (star_pos != std::string::npos)
-  // {
-  //   msg.replace(star_pos, sizeof("**"), "**");
-  //   star_pos += sizeof("**");
-  //   star_pos = msg.find("*", star_pos);
-  // }
-  // std::cout << msg << std::endl;
-
-  msg = replace(msg, "#", "##");
-  std::cout << msg << std::endl;
+  std::cout < < < < std::endl;
   return 0;
 }
