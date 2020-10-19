@@ -1200,6 +1200,7 @@ int main(int argc, char *argv[])
                                 if (client->server)
                                 {
                                     // if the request is from a server we process it as a server command
+
                                     serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
                                 else
