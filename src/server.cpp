@@ -152,6 +152,7 @@ std::string server_addr = getIP();
 std::string port_addr;
 std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
+std::list<int> disconnectedClients;
 
 // Open socket for specified port.
 
@@ -343,6 +344,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
     }
 
     // And remove from the list of open sockets.
+    disconnectedClients.push_back(socket);
 
     FD_CLR(socket, openSockets);
 }
@@ -441,7 +443,7 @@ void send_connected(int serverSocket, std::string name)
     }
     for (auto e : all_servers)
     {
-        if (e[0].empty() == false)
+        if (!e[0].empty())
         {
             msg += ";" + e[0] + "," + e[1] + "," + e[2];
         }
@@ -557,6 +559,36 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         strcpy(port, tokens[2].c_str());
         connect_to_server(server_address, port, openSockets, maxfds);
     }
+    else if (tokens[0].compare("DISCONNECT") == 0){
+        std::string message = "*LEAVE#";
+        if(tokens[1].compare("1")==0){
+            std::string to_group = tokens[2];
+            
+            for (auto const &pair : all_clients_servers)
+            {
+                if(to_group.compare(pair.second->name)==0){
+                    std::string response = send_message(pair.first, message);
+                    std::cout << response << std::endl;
+                    closeClient(pair.first, openSockets, maxfds, true);
+                    break;
+                }
+            }
+        }
+        else if (tokens[1].compare("2")==0){
+            std::string ip = tokens[2];
+            std::string port = tokens[3];
+            for (auto const &pair : all_clients_servers)
+            {
+                if( (ip.compare(pair.second->ip) == 0) && (port.compare( std::to_string(pair.second->port) ) == 0) ){
+                    std::string response = send_message(pair.first, message);
+                    std::cout << response << std::endl;
+                    closeClient(pair.first, openSockets, maxfds, true);
+                    break;
+                }
+            }
+        }
+       
+    }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
         std::string msg = "Servers connected to P3_group_1:\n";
@@ -601,7 +633,21 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
 
         find_server_to_send_MSG(to_group, count, message);
     }
+    else if (tokens[0].compare("SENDREQ") == 0)
+    {
+        std::string to_group = tokens[1];
+        std::string message = "*STATUSREQ," + group_name+'#';
+        for (auto const &pair : all_clients_servers)
+        {
+            if(to_group.compare(pair.second->name)==0){
+                std::string response = send_message(pair.first, message);
+                std::cout << response << std::endl;
+                break;
+            }
+        }
 
+        
+    }
     else
     {
         std::cout << "Unknown command from client:" << tokens[0] << std::endl;
@@ -757,7 +803,9 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 std::string group = pair.first;
                 int message_count = pair.second.size();
-                message += ',' + group + ',' + std::to_string(message_count);
+                if (!group.empty()){
+                    message += ',' + group + ',' + std::to_string(message_count);
+                }
             }
             message += '#';
             std::string response = send_message(serverSocket, message);
@@ -989,7 +1037,7 @@ int main(int argc, char *argv[])
                 printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
-            std::list<Client_Server *> disconnectedClients;
+            
             pendingRequest = "";
             while (n-- > 0)
             {
@@ -1006,7 +1054,6 @@ int main(int argc, char *argv[])
                             std::cout << "Client/Server closed connection: %d" << client->sock << "\n"
                                       << std::endl;
 
-                            disconnectedClients.push_back(client);
                             closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
                         // We don't check for -1 (nothing received) because select()
@@ -1092,7 +1139,7 @@ int main(int argc, char *argv[])
                 }
                 // Remove client from the clients list
                 for (auto const &c : disconnectedClients)
-                    all_clients_servers.erase(c->sock);
+                    all_clients_servers.erase(c);
             }
         }
     }
