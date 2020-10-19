@@ -497,7 +497,7 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
             //remove all the servers that are not answearing, or that we have connected to from friends.
             for (std::string name : remove_servers)
             {
-                remove_from_server_connections(group_name);
+                remove_from_server_connections(name);
             }
         }
         sleep(60);
@@ -1094,11 +1094,11 @@ int main(int argc, char *argv[])
                 char ip_str[INET_ADDRSTRLEN];
                 // now get it back and print it
                 inet_ntop(AF_INET, &(new_connection.sin_addr), ip_str, INET_ADDRSTRLEN);
-                std::cout << new_connection.sin_port << " " << ip_str << std::endl;
+                std::cout << ip_str << std::endl;
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-
+                std::cout<<ip_str<<std::endl;
                 new_server->port = -1;
                 all_clients_servers[serverSock] = new_server;
 
