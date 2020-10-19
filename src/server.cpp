@@ -396,7 +396,6 @@ void remove_from_server_connections(std::string name)
 {
 
     std::vector<int> remove_outer;
-    std::vector<std::string> remove_inner;
 
     for (auto const &pair : all_clients_servers)
     {
@@ -410,13 +409,12 @@ void remove_from_server_connections(std::string name)
             {
                 std::cout << "\n Removed :" << name << " from " << pair.second->name << std::endl;
                 remove_outer.push_back(pair.first);
-                remove_inner.push_back(pair2.first);
             }
         }
     }
-    for (int i = 0; i < (int)remove_outer.size(); i++)
+    for (int sock : remove_outer)
     {
-        servers_connections[remove_outer[i]].erase(remove_inner[i]);
+        servers_connections[sock].erase(name);
     }
 }
 
@@ -820,7 +818,24 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         }
         else if (tokens[0].compare("STATUSRESP") == 0)
         {
-            std::cout << buffer << std::endl;
+
+            //let's iterrate through all the servers that we were sent with the STATUSRESP command.
+            for (int i = 1; i <= (((int)tokens.size() - 2) / 2); i++)
+            {
+                // get the name of the group and the number of messages
+                std::string group = tokens[(i * 2) + 1];
+                std::string message_count = tokens[(i * 2) + 2];
+
+                //let's check if we are also connected to him. If we are we, request the message and store it so it will be sent automatically later
+                for (auto const &pair : all_clients_servers)
+                {
+                    if ((pair.second->name.compare(group) == 0))
+                    {
+                        std::string request = "*GET_MSG," + group + "#";
+                        std::string response = send_message(serverSocket, request);
+                    }
+                }
+            }
         }
         else
         {
@@ -906,24 +921,24 @@ void send_keepalive()
 int main(int argc, char *argv[])
 {
     bool finished;
-    int clientListenSock; // Socket for client connections to server
-    int clientSock;       // Socket of connecting client
-    int serverListenSock; // Socket for server connections to server
-    int serverSock;       // Socket of connecting server
-    fd_set openSockets;   // Current open sockets
-    fd_set readSockets;   // Socket list for select()
-    fd_set exceptSockets; // Exception socket list
-    int maxfds;           // Passed to select() as max fd in set
-    struct sockaddr_in new_connection;
-    socklen_t connectionLen;
-    char buffer[1000];          // buffer for reading from clients
-    char bytestuffBuffer[1000]; // actual message
-    port_addr = argv[1];
-    bool foundHashtag;
+    int clientListenSock;              // Socket for client connections to server
+    int clientSock;                    // Socket of connecting client
+    int serverListenSock;              // Socket for server connections to server
+    int serverSock;                    // Socket of connecting server
+    fd_set openSockets;                // Current open sockets
+    fd_set readSockets;                // Socket list for select()
+    fd_set exceptSockets;              // Exception socket list
+    int maxfds;                        // Passed to select() as max fd in set
+    struct sockaddr_in new_connection; // The sockaddr of any new client/server
+    socklen_t connectionLen;           // The length of  new_connection
+    char buffer[1000];                 // buffer for reading from clients
+    char bytestuffBuffer[1000];        // actual message, the data from buffer until the first single hashtag
+    port_addr = argv[1];               // the port address to run on
+    bool foundHashtag;                 // Variable used in while loop to read from buffer, we read until a single hashtag is found
     size_t off;
     char next;
-    std::string pendingRequest;
-    bool pending;
+    std::string pendingRequest; // if a message exeeds the buffer size, we store the message in this variable until the full message is read
+    bool pending;               // this variable indicates whether there is some data in the pendingRequest variable
     // group_name+=argv[1];
     if (argc != 2)
     {
@@ -1073,14 +1088,14 @@ int main(int argc, char *argv[])
                             char *p;
                             if (!pending)
                             {
+                                // if there is no data pending, we erase the request variable
                                 pendingRequest = "";
                             }
 
                             pending = false;
-
+                            // we read the buffer until a single hashtag is found
                             while (!foundHashtag)
                             {
-                                // printf("peek '%s'\n", buffer);
 
                                 p = strchr(buffer + off, '#');
 
@@ -1134,10 +1149,12 @@ int main(int argc, char *argv[])
                                 printf("'%s'\n", buffer);
                                 if (client->server)
                                 {
+                                    // if the request is from a server we process it as a server command
                                     serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
                                 else
                                 {
+                                    // if the request is from a client we process it as a client command
                                     clientCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
                             }
