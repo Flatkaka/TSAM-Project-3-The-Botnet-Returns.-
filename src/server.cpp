@@ -217,8 +217,8 @@ int open_socket(int portno)
 std::string send_message(int socket, std::string req)
 {
     int nwrite = send(socket, req.c_str(), req.length(), 0);
-    std::cout<<"\033[1;33mWe send to "<< socket <<": \033[0m"<<std::endl;
-    std::cout<< req <<std::endl;
+    std::cout << "\033[1;33mWe send to " << socket << ": \033[0m" << std::endl;
+    std::cout << req << std::endl;
     if (nwrite < 0)
     {
         perror("send() to server failed: ");
@@ -408,7 +408,7 @@ void remove_from_server_connections(std::string name)
             std::cout << pair2.first << " ";
             if (pair2.first.compare(name) == 0)
             {
-                std::cout << "\n Removed :" << name <<" from " <<pair.second->name<<std::endl;
+                std::cout << "\n Removed :" << name << " from " << pair.second->name << std::endl;
                 remove_outer.push_back(pair.first);
                 remove_inner.push_back(pair2.first);
             }
@@ -433,7 +433,7 @@ void send_connected(int serverSocket, std::string name)
             server.push_back(pair.second->ip);
             server.push_back(std::to_string(pair.second->port));
             all_servers.insert(server);
-            for (auto const &pair2 :servers_connections[pair.first])
+            for (auto const &pair2 : servers_connections[pair.first])
             {
                 std::vector<std::string> server;
                 server.push_back(pair2.second->name);
@@ -459,9 +459,11 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
 {
 
     //run through all of the servers we are connect
-    while(true){
+    while (true)
+    {
 
-        if(server_count < 10){
+        if (server_count < 10)
+        {
             bool sent = false;
 
             for (auto const &pair : servers_connections)
@@ -476,31 +478,31 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
                     strcpy(server_address, ip.c_str());
                     char *port = new char[port_str.length() + 1];
                     strcpy(port, port_str.c_str());
-                    std::cout << "ip and port for group " << pair2.first << " are " << ip << " "<< port_str << std::endl;
+                    std::cout << "ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
                     //try to connect that server that we are not connected to.
-                    if (connect_to_server(server_address, port, openSockets, maxfds))
+                    std::map<std::string, Client_Server *> server_servers = pair.second;
+                    if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
                     {
                         //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
 
-                        std::cout<<"Sending to server through friends: "<<pair2.first<<std::endl;
-                        std::map<std::string, Client_Server *> server_servers = pair.second;
-                        server_servers.erase(pair2.first);
-                        remove_from_server_connections(pair2.first);
+                        std::cout << "Sending to server through friends: " << pair2.first << std::endl;
+
                         servers_connections[pair.first] = server_servers;
                         std::cout << "Removed in:" << pair.first << std::endl;
-                        
+
                         sent = true;
-                        break;
                     }
+                    server_servers.erase(pair2.first);
+                    remove_from_server_connections(pair2.first);
+                    if (sent)
+                        break;
                 }
-                if (sent)break;
+                if (sent)
+                    break;
             }
-            
         }
         sleep(60);
-            
     }
-    
 }
 
 std::string extract_msg_string(std::string message, int max)
@@ -561,14 +563,17 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         strcpy(port, tokens[2].c_str());
         connect_to_server(server_address, port, openSockets, maxfds);
     }
-    else if (tokens[0].compare("DISCONNECT") == 0){
+    else if (tokens[0].compare("DISCONNECT") == 0)
+    {
         std::string message = "*LEAVE#";
-        if(tokens[1].compare("1")==0){
+        if (tokens[1].compare("1") == 0)
+        {
             std::string to_group = tokens[2];
-            
+
             for (auto const &pair : all_clients_servers)
             {
-                if(to_group.compare(pair.second->name)==0){
+                if (to_group.compare(pair.second->name) == 0)
+                {
                     std::string response = send_message(pair.first, message);
                     std::cout << response << std::endl;
                     closeClient(pair.first, openSockets, maxfds, true);
@@ -576,12 +581,14 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
                 }
             }
         }
-        else if (tokens[1].compare("2")==0){
+        else if (tokens[1].compare("2") == 0)
+        {
             std::string ip = tokens[2];
             std::string port = tokens[3];
             for (auto const &pair : all_clients_servers)
             {
-                if( (ip.compare(pair.second->ip) == 0) && (port.compare( std::to_string(pair.second->port) ) == 0) ){
+                if ((ip.compare(pair.second->ip) == 0) && (port.compare(std::to_string(pair.second->port)) == 0))
+                {
                     std::string response = send_message(pair.first, message);
                     std::cout << response << std::endl;
                     closeClient(pair.first, openSockets, maxfds, true);
@@ -589,7 +596,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
                 }
             }
         }
-       
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
@@ -638,17 +644,16 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (tokens[0].compare("SENDREQ") == 0)
     {
         std::string to_group = tokens[1];
-        std::string message = "*STATUSREQ," + group_name+'#';
+        std::string message = "*STATUSREQ," + group_name + '#';
         for (auto const &pair : all_clients_servers)
         {
-            if(to_group.compare(pair.second->name)==0){
+            if (to_group.compare(pair.second->name) == 0)
+            {
                 std::string response = send_message(pair.first, message);
                 std::cout << response << std::endl;
                 break;
             }
         }
-
-        
     }
     else
     {
@@ -720,18 +725,17 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
-                    if ( (pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && pair.second->port.compare(port)==0))
+                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && pair.second->port.compare(port) == 0))
                     {
                         skip = true;
                         break;
                     }
                 }
 
-
                 //check if server has same name as this server, if it has it we are not intrested adding it to server_connections,
                 // if server has same address and  same port, we are not intrested adding it too.
                 //if server is skiped,(server is connected ), we are not interested adding it too
-                if (group_name.compare(name) != 0  && (!(server_addr.compare(address) == 0 && port_addr.compare(port)==0)) && !skip)
+                if (group_name.compare(name) != 0 && (!(server_addr.compare(address) == 0 && port_addr.compare(port) == 0)) && !skip)
                 {
                     Client_Server *new_server = new Client_Server(serverSocket, true);
                     std::string name = tokens[(i * 3) + 1];
@@ -739,12 +743,11 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     new_server->ip = tokens[(3 * i) + 2];
                     new_server->port = atoi(tokens[(3 * i) + 3].c_str());
                     server_servers[name] = new_server;
-                    std::cout << "server name: " << new_server->name << "is connected to"<< serverSocket << std::endl;
+                    std::cout << "server name: " << new_server->name << "is connected to" << serverSocket << std::endl;
                 }
                 skip = false;
             }
             servers_connections[serverSocket] = server_servers;
-            
         }
         else if (tokens[0].compare("KEEPALIVE") == 0)
         {
@@ -806,7 +809,8 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 std::string group = pair.first;
                 int message_count = pair.second.size();
-                if (!group.empty()){
+                if (!group.empty())
+                {
                     message += ',' + group + ',' + std::to_string(message_count);
                 }
             }
@@ -838,7 +842,6 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::string token;
     std::string mini;
 
-    
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -964,7 +967,7 @@ int main(int argc, char *argv[])
     }
 
     std::thread keepalivethread(send_keepalive);
-    std::thread find_other_servers( connect_to_server_in_servers_connections, &openSockets, &maxfds);
+    std::thread find_other_servers(connect_to_server_in_servers_connections, &openSockets, &maxfds);
 
     finished = false;
 
@@ -1040,7 +1043,7 @@ int main(int argc, char *argv[])
                 printf("\033[1;32mServer connected on server: %d \033[0m", serverSock);
             }
             // Now check for commands from all_clients_servers
-            
+
             pendingRequest = "";
             while (n-- > 0)
             {
@@ -1054,7 +1057,7 @@ int main(int argc, char *argv[])
                         // recv() == 0 means client has closed connection
                         if (recv(client->sock, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0)
                         {
-                            std::cout << "\033[1;31mClient/Server closed connection: \033[0m"<<client->sock << std::endl;
+                            std::cout << "\033[1;31mClient/Server closed connection: \033[0m" << client->sock << std::endl;
 
                             closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
@@ -1063,7 +1066,7 @@ int main(int argc, char *argv[])
                         else
                         {
                             // memset(buffer, 0, sizeof(buffer));
-                            
+
                             printf("\033[1;32mFrom Whole buffer:\n \033[0m '%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
@@ -1127,7 +1130,7 @@ int main(int argc, char *argv[])
                                 strcpy(long_req, pendingRequest.c_str());
 
                                 std::vector<std::string> tokens = tokenize_command(long_req);
-                                std::cout<<"\033[1;32mFrom "<< std::to_string(client->sock) <<" We recived : \033[0m"<<std::endl;
+                                std::cout << "\033[1;32mFrom " << std::to_string(client->sock) << " We recived : \033[0m" << std::endl;
                                 printf("'%s'\n", buffer);
                                 if (client->server)
                                 {

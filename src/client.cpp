@@ -149,6 +149,16 @@ int main(int argc, char *argv[])
         {
             getline(std::cin, args_from_user);
         }
+<<<<<<< HEAD
+        args_from_user.substr(0, args_from_user.size() - 1);
+        args_from_user = replace(args_from_user, "*", "**");
+        args_from_user = replace(args_from_user, "#", "##");
+        args_from_user = "*" + args_from_user + "#";
+        printf("At %s We sent :\n", asctime(timeinfo));
+        printf("%s\n", args_from_user.c_str());
+        strcpy(buffer, args_from_user.c_str());
+        nwrite = send(serverSocket, buffer, strlen(buffer), 0);
+=======
 
         args_from_user.substr(0, args_from_user.size()-1);
         args_from_user = replace(args_from_user, "*", "**");
@@ -160,6 +170,7 @@ int main(int argc, char *argv[])
 
 
         nwrite = send(serverSocket, args_from_user.c_str(), args_from_user.length(), 0);
+>>>>>>> 51620bf572b416f244e0a0065897c5e67fc96052
 
         if (nwrite == -1)
         {
