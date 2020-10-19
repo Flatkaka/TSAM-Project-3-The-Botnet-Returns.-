@@ -217,8 +217,7 @@ int open_socket(int portno)
 std::string send_message(int socket, std::string req)
 {
     int nwrite = send(socket, req.c_str(), req.length(), 0);
-    std::cout<<"\033[1;33mWe send to "<< socket <<": \033[0m"<<std::endl;
-    std::cout<< req <<std::endl;
+    std::cout << "we send to " << socket << " this: " << req << std::endl;
     if (nwrite < 0)
     {
         perror("send() to server failed: ");
@@ -320,7 +319,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
 
 void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 {
-    std::cout << "\033[1;31mServer " << all_clients_servers[socket]->name << " left.\033[0m" << std::endl;
+    std::cout << "Server " << all_clients_servers[socket]->name << " left." << std::endl;
     if (server)
     {
         // Remove client from all the map.
@@ -836,7 +835,7 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::string token;
     std::string mini;
 
-    
+    printf("Tokenized buffer, '%s'\n", buffer);
     // Split command from client into tokens for parsing
     std::stringstream stream(buffer);
     int count = 0;
@@ -1004,7 +1003,7 @@ int main(int argc, char *argv[])
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
 
-                printf("\033[1;32mClient connected on server: %d \033[0m\n", clientSock);
+                printf("Client connected on server: %d\n", clientSock);
             }
             // Next, accept  any new server connections to the server on the server listening socket
             if (FD_ISSET(serverListenSock, &readSockets) && (server_count < 16))
@@ -1035,7 +1034,7 @@ int main(int argc, char *argv[])
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
 
-                printf("\033[1;32mServer connected on server: %d \033[0m", serverSock);
+                printf("Server connected on server: %d\n", serverSock);
             }
             // Now check for commands from all_clients_servers
             
@@ -1052,7 +1051,8 @@ int main(int argc, char *argv[])
                         // recv() == 0 means client has closed connection
                         if (recv(client->sock, buffer, sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0)
                         {
-                            std::cout << "\033[1;31mClient/Server closed connection: \033[0m"<<client->sock << std::endl;
+                            std::cout << "Client/Server closed connection: %d" << client->sock << "\n"
+                                      << std::endl;
 
                             closeClient(client->sock, &openSockets, &maxfds, client->server);
                         }
@@ -1061,8 +1061,7 @@ int main(int argc, char *argv[])
                         else
                         {
                             // memset(buffer, 0, sizeof(buffer));
-                            
-                            printf("\033[1;32mFrom Whole buffer:\n \033[0m '%s'\n", buffer);
+                            printf("Whole buffer: '%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
                             char *p;
@@ -1125,8 +1124,7 @@ int main(int argc, char *argv[])
                                 strcpy(long_req, pendingRequest.c_str());
 
                                 std::vector<std::string> tokens = tokenize_command(long_req);
-                                std::cout<<"\033[1;32mFrom "<< std::to_string(client->sock) <<" We recived : \033[0m"<<std::endl;
-                                printf("'%s'\n", buffer);
+
                                 if (client->server)
                                 {
                                     serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
