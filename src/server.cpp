@@ -668,23 +668,36 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
     if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
-
-        all_clients_servers[serverSocket]->name = tokens[1];
-        all_clients_servers[serverSocket]->verified = true;
-
-        //if we have not sent queryserver before we send it again
-        if (!all_clients_servers[serverSocket]->sent)
-        {
-            all_clients_servers[serverSocket]->sent = true;
-            std::string req = "*QUERYSERVERS," + group_name + '#';
-            send_message(serverSocket, req);
+        bool multiple = false;
+        if(!all_clients_servers[serverSocket]->verified){
+            for (auto const &pair : all_clients_servers)
+            {
+                if ((pair.second->name.compare(tokens[0]) == 0) || (pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0 && (pair.second->port == all_clients_servers[serverSocket]->port))
+                {
+                    
+                    closeClient(serverSocket, openSockets, maxfds, true);
+                    multiple = true;
+                }
+            }
         }
+        if (!multiple){
+            all_clients_servers[serverSocket]->name = tokens[1];
+            all_clients_servers[serverSocket]->verified = true;
 
-        //this is for when we are portfowrading and don't know our serveraddress.
-        if (server_addr.compare("0.0.0.0") != 0)
-        {
+            //if we have not sent queryserver before we send it again
+            if (!all_clients_servers[serverSocket]->sent)
+            {
+                all_clients_servers[serverSocket]->sent = true;
+                std::string req = "*QUERYSERVERS," + group_name + '#';
+                send_message(serverSocket, req);
+            }
 
-            send_connected(serverSocket, tokens[1]);
+            //this is for when we are portfowrading and don't know our serveraddress.
+            if (server_addr.compare("0.0.0.0") != 0)
+            {
+
+                send_connected(serverSocket, tokens[1]);
+            }
         }
     }
     //check if the servers has sent first QUERYSERVERS
