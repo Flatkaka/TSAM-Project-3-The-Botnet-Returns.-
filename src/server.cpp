@@ -713,18 +713,19 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             //let's itterrate through all the servers that we were sent with the CONNECTED command.
             for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
             {
+                std::string name = tokens[(i * 3) + 1];
+                std::string port = tokens[(i * 3) + 3];
+                std::string address = tokens[(i * 3) + 2];
                 //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
-                    if (pair.second->name.compare(tokens[(3 * i) + 1]) == 0)
+                    if ( (pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && pair.second->port.compare(port)==0))
                     {
                         skip = true;
                         break;
                     }
                 }
-                std::string name = tokens[(i * 3) + 1];
-                std::string port = tokens[(i * 3) + 3];
-                std::string address = tokens[(i * 3) + 2];
+
 
                 //check if server has same name as this server, if it has it we are not intrested adding it to server_connections,
                 // if server has same address and  same port, we are not intrested adding it too.
