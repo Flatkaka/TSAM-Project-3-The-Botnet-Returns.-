@@ -676,8 +676,13 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                     }
                 }
                 std::string name = tokens[(i * 3) + 1];
+                std::string port = tokens[(i * 3) + 3];
                 std::string address = tokens[(i * 3) + 2];
-                if (group_name.compare(name) != 0 && server_addr.compare(address) != 0 && !skip)
+
+                //check if server has same name as this server, if it has it we are not intrested adding it to server_connections,
+                // if server has same address and  same port, we are not intrested adding it too.
+                //if server is skiped,(server is connected ), we are not interested adding it too
+                if (group_name.compare(name) != 0  && (!(server_addr.compare(address) == 0 && port_addr.compare(port)==0)) && !skip)
                 {
                     Client_Server *new_server = new Client_Server(serverSocket, true);
                     std::string name = tokens[(i * 3) + 1];
