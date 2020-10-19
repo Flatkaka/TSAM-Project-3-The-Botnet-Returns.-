@@ -396,7 +396,6 @@ void remove_from_server_connections(std::string name)
 {
 
     std::vector<int> remove_outer;
-    std::vector<std::string> remove_inner;
 
     for (auto const &pair : all_clients_servers)
     {
@@ -410,13 +409,13 @@ void remove_from_server_connections(std::string name)
             {
                 std::cout << "\n Removed :" << name << " from " << pair.second->name << std::endl;
                 remove_outer.push_back(pair.first);
-                remove_inner.push_back(pair2.first);
+
             }
         }
     }
-    for (int i = 0; i < (int)remove_outer.size(); i++)
+    for (int sock : remove_outer)
     {
-        servers_connections[remove_outer[i]].erase(remove_inner[i]);
+        servers_connections[sock].erase(name);
     }
 }
 
@@ -463,9 +462,9 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
     {
 
         if (server_count < 10)
-        {
+        {   
             bool sent = false;
-
+            std::vector<std::string> remove_servers;
             for (auto const &pair : servers_connections)
             {
                 //run through each server that the servers we are connected to see what server they are connected
@@ -480,25 +479,25 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
                     strcpy(port, port_str.c_str());
                     std::cout << "ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
                     //try to connect that server that we are not connected to.
-                    std::map<std::string, Client_Server *> server_servers = pair.second;
                     if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
                     {
                         //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
 
                         std::cout << "Sending to server through friends: " << pair2.first << std::endl;
-
-                        servers_connections[pair.first] = server_servers;
                         std::cout << "Removed in:" << pair.first << std::endl;
-
                         sent = true;
                     }
-                    server_servers.erase(pair2.first);
-                    remove_from_server_connections(pair2.first);
+                    remove_servers.push_back(pair2.first);
+                    
                     if (sent)
                         break;
                 }
                 if (sent)
                     break;
+            }
+            //remove all the servers that are not answearing, or that we have connected to from friends.
+            for (std::string name:remove_servers){
+                remove_from_server_connections(group_name);
             }
         }
         sleep(60);
@@ -633,13 +632,26 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (tokens[0].compare("SENDMSG") == 0)
     {
         std::string to_group = tokens[1];
-        std::string from_group = tokens[2];
         std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
         std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
         find_server_to_send_MSG(to_group, count, message);
+    }
+    else if (tokens[0].compare("SENDALLMSG") == 0)
+    {
+        std::string extracted_msg =extract_msg(buffer, 2);
+        for (auto const &pair : all_clients_servers)
+        {
+            std::string message = "*SEND_MSG," + pair.second->name + "," + group_name + "," +extracted_msg + "#";
+            std::cout << "message that we save:  " << message << std::endl;
+            stored_messages[pair.second->name].push_back(message);
+            int count = stored_messages[pair.second->name].size();
+
+            find_server_to_send_MSG(pair.second->name, count, message);
+        }  
+        
     }
     else if (tokens[0].compare("SENDREQ") == 0)
     {
