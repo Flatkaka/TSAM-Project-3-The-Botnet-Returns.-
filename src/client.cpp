@@ -38,20 +38,20 @@ void listenServer(int serverSocket, struct tm *timeinfo)
 
     while (true)
     {
-        memset(buffer, 0, sizeof(buffer));
-        nread = read(serverSocket, buffer, sizeof(buffer));
+       memset(buffer, 0, sizeof(buffer));
+       nread = read(serverSocket, buffer, sizeof(buffer));
 
-        if (nread == 0) // Server has dropped us
-        {
-            printf("Over and Out\n");
-            exit(0);
-        }
-        else if (nread > 0)
-        {
-            printf("At %sWe recived :\n", asctime(timeinfo));
-            printf("%s\n", buffer);
-        }
-        printf("here\n");
+       if(nread == 0)                      // Server has dropped us
+       {
+          printf("Over and Out\n");
+          exit(0);
+       }
+       else if(nread > 0)
+       {
+          std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We recived : \033[0m"<<std::endl;
+          printf("%s\n", buffer);
+       }
+       printf("here\n");
     }
 }
 
@@ -149,6 +149,7 @@ int main(int argc, char *argv[])
         {
             getline(std::cin, args_from_user);
         }
+<<<<<<< HEAD
         args_from_user.substr(0, args_from_user.size() - 1);
         args_from_user = replace(args_from_user, "*", "**");
         args_from_user = replace(args_from_user, "#", "##");
@@ -157,6 +158,19 @@ int main(int argc, char *argv[])
         printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
         nwrite = send(serverSocket, buffer, strlen(buffer), 0);
+=======
+
+        args_from_user.substr(0, args_from_user.size()-1);
+        args_from_user = replace(args_from_user, "*", "**");
+        args_from_user = replace(args_from_user, "#", "##");
+        args_from_user="*"+args_from_user+"#";
+        std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We sent : \033[0m"<<std::endl;
+        printf("%s\n", args_from_user.c_str());
+        strcpy(buffer, args_from_user.c_str());
+
+
+        nwrite = send(serverSocket, args_from_user.c_str(), args_from_user.length(), 0);
+>>>>>>> 51620bf572b416f244e0a0065897c5e67fc96052
 
         if (nwrite == -1)
         {
