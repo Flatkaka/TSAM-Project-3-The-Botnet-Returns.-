@@ -347,7 +347,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 
     // And remove from the list of open sockets.
     disconnectedClients.push_back(socket);
-
+    close(socket);
     FD_CLR(socket, openSockets);
 }
 
@@ -684,9 +684,12 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         {
             for (auto const &pair : all_clients_servers)
             {
-                if ((pair.second->name.compare(tokens[0]) == 0) || ((pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0) && (pair.second->port == all_clients_servers[serverSocket]->port)))
+                if ((pair.second->name.compare(tokens[1]) == 0) && (pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0) && (pair.second->port == all_clients_servers[serverSocket]->port))
                 {
-
+                    std::cout<<pair.second->name<<tokens[1] <<std::endl;
+                    std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
+                    std::cout<<pair.second->port << all_clients_servers[serverSocket]->port<<std::endl;
+                    std::cout<<"Tryed to connect ot us again"<<tokens[1]<<std::endl;
                     closeClient(serverSocket, openSockets, maxfds, true);
                     multiple = true;
                 }
