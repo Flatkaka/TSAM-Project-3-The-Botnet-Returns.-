@@ -57,8 +57,6 @@ void listenServer(int serverSocket, struct tm *timeinfo)
 
 std::string replace(std::string input, std::string from, std::string to)
 {
-    std::cout << from << std::endl;
-    std::cout << to << std::endl;
     size_t pos = 0;
     pos = input.find(from.c_str(), pos);
     while (pos != std::string::npos)
@@ -152,14 +150,13 @@ int main(int argc, char *argv[])
             getline(std::cin, args_from_user);
         }
         args_from_user.substr(0, args_from_user.size() - 1);
+        args_from_user = replace(args_from_user, "*", "**");
+        args_from_user = replace(args_from_user, "#", "##");
         args_from_user = "*" + args_from_user + "#";
         printf("At %s We sent :\n", asctime(timeinfo));
         printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
-        std::string msg = buffer;
-        msg = replace(msg, "*", "**");
-        msg = replace(msg, "#", "##");
-        nwrite = send(serverSocket, msg.c_str(), msg.length(), 0);
+        nwrite = send(serverSocket, buffer, strlen(buffer), 0);
 
         if (nwrite == -1)
         {

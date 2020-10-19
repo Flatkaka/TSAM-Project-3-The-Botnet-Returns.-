@@ -254,7 +254,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     if (getaddrinfo(address, port, &hints, &svr) != 0)
     {
         perror("getaddrinfo failed: ");
-        exit(0);
+        return -1;
     }
 
     struct hostent *server;
@@ -276,6 +276,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     {
         printf("Failed to set SO_REUSEADDR for port %s\n", port);
         perror("setsockopt failed: ");
+        return -1;
     }
 
     if (connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
@@ -470,17 +471,20 @@ int connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
             char *port = new char[port_str.length() + 1];
             strcpy(port, port_str.c_str());
             std::cout << "ip and port for group " << pair2.first << " are " << ip << port_str << std::endl;
+            std::map<std::string, Client_Server *> server_servers = pair.second;
             //try to connect that server that we are not connected to.
-            if (connect_to_server(server_address, port, openSockets, maxfds))
+
+            if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
             {
                 //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
-                std::map<std::string, Client_Server *> server_servers = pair.second;
-                server_servers.erase(pair2.first);
-                remove_from_server_connections(pair2.first);
+
                 servers_connections[pair.first] = server_servers;
                 std::cout << "Removed in:" << pair.first << std::endl;
                 return 1;
             }
+
+            server_servers.erase(pair2.first);
+            remove_from_server_connections(pair2.first);
         }
     }
     return -1;
