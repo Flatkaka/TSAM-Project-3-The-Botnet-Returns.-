@@ -254,7 +254,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     if (getaddrinfo(address, port, &hints, &svr) != 0)
     {
         perror("getaddrinfo failed: ");
-        exit(0);
+        return -1;
     }
 
     struct hostent *server;
@@ -276,6 +276,7 @@ int connect_to_server(char *address, char *port, fd_set *openSockets, int *maxfd
     {
         printf("Failed to set SO_REUSEADDR for port %s\n", port);
         perror("setsockopt failed: ");
+        return -1;
     }
 
     if (connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
