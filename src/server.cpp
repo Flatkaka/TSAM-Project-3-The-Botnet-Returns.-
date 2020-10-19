@@ -463,7 +463,7 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
         if (server_count < 10)
         {
             bool sent = false;
-
+            std::vector<std::string> remove_servers;
             for (auto const &pair : servers_connections)
             {
                 //run through each server that the servers we are connected to see what server they are connected
@@ -478,25 +478,26 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
                     strcpy(port, port_str.c_str());
                     std::cout << "ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
                     //try to connect that server that we are not connected to.
-                    std::map<std::string, Client_Server *> server_servers = pair.second;
                     if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
                     {
                         //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
 
                         std::cout << "Sending to server through friends: " << pair2.first << std::endl;
-
-                        servers_connections[pair.first] = server_servers;
                         std::cout << "Removed in:" << pair.first << std::endl;
-
                         sent = true;
                     }
-                    server_servers.erase(pair2.first);
-                    remove_from_server_connections(pair2.first);
+                    remove_servers.push_back(pair2.first);
+
                     if (sent)
                         break;
                 }
                 if (sent)
                     break;
+            }
+            //remove all the servers that are not answearing, or that we have connected to from friends.
+            for (std::string name : remove_servers)
+            {
+                remove_from_server_connections(group_name);
             }
         }
         sleep(60);
@@ -631,13 +632,25 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (tokens[0].compare("SENDMSG") == 0)
     {
         std::string to_group = tokens[1];
-        std::string from_group = tokens[2];
         std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
         std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
         find_server_to_send_MSG(to_group, count, message);
+    }
+    else if (tokens[0].compare("SENDALLMSG") == 0)
+    {
+        std::string extracted_msg = extract_msg(buffer, 2);
+        for (auto const &pair : all_clients_servers)
+        {
+            std::string message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
+            std::cout << "message that we save:  " << message << std::endl;
+            stored_messages[pair.second->name].push_back(message);
+            int count = stored_messages[pair.second->name].size();
+
+            find_server_to_send_MSG(pair.second->name, count, message);
+        }
     }
     else if (tokens[0].compare("SENDREQ") == 0)
     {
@@ -666,23 +679,38 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
     if ((tokens[0].compare("QUERYSERVERS") == 0))
     {
-
-        all_clients_servers[serverSocket]->name = tokens[1];
-        all_clients_servers[serverSocket]->verified = true;
-
-        //if we have not sent queryserver before we send it again
-        if (!all_clients_servers[serverSocket]->sent)
+        bool multiple = false;
+        if (!all_clients_servers[serverSocket]->verified)
         {
-            all_clients_servers[serverSocket]->sent = true;
-            std::string req = "*QUERYSERVERS," + group_name + '#';
-            send_message(serverSocket, req);
+            for (auto const &pair : all_clients_servers)
+            {
+                if ((pair.second->name.compare(tokens[0]) == 0) || ((pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0) && (pair.second->port == all_clients_servers[serverSocket]->port)))
+                {
+
+                    closeClient(serverSocket, openSockets, maxfds, true);
+                    multiple = true;
+                }
+            }
         }
-
-        //this is for when we are portfowrading and don't know our serveraddress.
-        if (server_addr.compare("0.0.0.0") != 0)
+        if (!multiple)
         {
+            all_clients_servers[serverSocket]->name = tokens[1];
+            all_clients_servers[serverSocket]->verified = true;
 
-            send_connected(serverSocket, tokens[1]);
+            //if we have not sent queryserver before we send it again
+            if (!all_clients_servers[serverSocket]->sent)
+            {
+                all_clients_servers[serverSocket]->sent = true;
+                std::string req = "*QUERYSERVERS," + group_name + '#';
+                send_message(serverSocket, req);
+            }
+
+            //this is for when we are portfowrading and don't know our serveraddress.
+            if (server_addr.compare("0.0.0.0") != 0)
+            {
+
+                send_connected(serverSocket, tokens[1]);
+            }
         }
     }
     //check if the servers has sent first QUERYSERVERS
@@ -723,7 +751,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
-                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && pair.second->port.compare(port) == 0))
+                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && std::to_string(pair.second->port).compare(port) == 0))
                     {
                         skip = true;
                         break;
@@ -906,15 +934,35 @@ void send_keepalive()
     {
         for (auto const &pair : all_clients_servers)
         {
+            //check if the connetion is server.
             if (pair.second->server)
             {
                 std::vector<std::string> messages = stored_messages[pair.second->name];
                 std::string msg = "*KEEPALIVE," + std::to_string(messages.size()) + "#";
-                std::cout << msg << std::endl;
                 send_message(pair.first, msg);
             }
         }
         sleep(90);
+    }
+}
+
+//we wan't to keep serverconections list up to date so we send queryservers to all the servers we are connected.
+void send_queryservers()
+{
+
+    while (true)
+    {
+        for (auto const &pair : all_clients_servers)
+        {
+            //check if the connetion is server.
+            if (pair.second->server)
+            {
+                std::string msg = "*QUERYSERVERS," + group_name + '#';
+                send_message(pair.first, msg);
+            }
+        }
+        //we don't want to spamm this request, maybe every 10 min.
+        sleep(600);
     }
 }
 
@@ -981,7 +1029,9 @@ int main(int argc, char *argv[])
         maxfds = std::max(maxfds, serverListenSock);
     }
 
-    std::thread keepalivethread(send_keepalive);
+    std::thread keepalive_thread(send_keepalive);
+    std::thread queryservers_thread(send_queryservers);
+
     std::thread find_other_servers(connect_to_server_in_servers_connections, &openSockets, &maxfds);
 
     finished = false;
