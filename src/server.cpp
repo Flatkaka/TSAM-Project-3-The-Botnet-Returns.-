@@ -725,7 +725,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
-                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && pair.second->port.compare(port) == 0))
+                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && std::to_string(pair.second->port).compare(port) == 0))
                     {
                         skip = true;
                         break;
@@ -891,15 +891,35 @@ void send_keepalive()
     {
         for (auto const &pair : all_clients_servers)
         {
+            //check if the connetion is server.
             if (pair.second->server)
             {
                 std::vector<std::string> messages = stored_messages[pair.second->name];
                 std::string msg = "*KEEPALIVE," + std::to_string(messages.size()) + "#";
-                std::cout << msg << std::endl;
                 send_message(pair.first, msg);
             }
         }
         sleep(90);
+    }
+}
+
+//we wan't to keep serverconections list up to date so we send queryservers to all the servers we are connected.
+void send_queryservers()
+{
+
+    while (true)
+    {
+        for (auto const &pair : all_clients_servers)
+        {
+            //check if the connetion is server.
+            if (pair.second->server)
+            {
+                std::string msg = "*QUERYSERVERS," + group_name + '#';
+                send_message(pair.first, msg);
+            }
+        }
+        //we don't want to spamm this request, maybe every 10 min.
+        sleep(600);
     }
 }
 
@@ -966,7 +986,9 @@ int main(int argc, char *argv[])
         maxfds = std::max(maxfds, serverListenSock);
     }
 
-    std::thread keepalivethread(send_keepalive);
+    std::thread keepalive_thread(send_keepalive);
+    std::thread queryservers_thread(send_queryservers);
+    
     std::thread find_other_servers(connect_to_server_in_servers_connections, &openSockets, &maxfds);
 
     finished = false;
