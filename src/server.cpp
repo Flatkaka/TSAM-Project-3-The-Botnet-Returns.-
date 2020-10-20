@@ -347,7 +347,6 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 
     // And remove from the list of open sockets.
     disconnectedClients.push_back(socket);
-    close(socket);
     FD_CLR(socket, openSockets);
 }
 
@@ -1034,7 +1033,6 @@ int main(int argc, char *argv[])
 
     std::thread keepalive_thread(send_keepalive);
     std::thread queryservers_thread(send_queryservers);
-
     std::thread find_other_servers(connect_to_server_in_servers_connections, &openSockets, &maxfds);
 
     finished = false;
@@ -1050,7 +1048,7 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
 
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-
+        
         if (n < 0)
         {
             perror("select failed - closing down\n");
