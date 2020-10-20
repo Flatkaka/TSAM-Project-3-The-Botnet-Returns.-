@@ -475,7 +475,7 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
                     strcpy(server_address, ip.c_str());
                     char *port = new char[port_str.length() + 1];
                     strcpy(port, port_str.c_str());
-                    std::cout << "ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
+                    std::cout << "Ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
                     //try to connect that server that we are not connected to.
                     if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
                     {
@@ -552,7 +552,9 @@ std::string extract_msg(char *buffer, int max)
 
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vector<std::string> tokens, char *buffer)
 {
-
+    std::string msg;
+    std::string message;
+    std::string response;
     if ((tokens[0].compare("CONNECT") == 0) && (tokens.size() == 3))
     {
         char *server_address = new char[tokens[1].length() + 1];
@@ -563,7 +565,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("DISCONNECT") == 0)
     {
-        std::string message = "*LEAVE#";
+        message = "*LEAVE#";
         if (tokens[1].compare("1") == 0)
         {
             std::string to_group = tokens[2];
@@ -572,7 +574,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 if (to_group.compare(pair.second->name) == 0)
                 {
-                    std::string response = send_message(pair.first, message);
+                    response = send_message(pair.first, message);
                     std::cout << response << std::endl;
                     closeClient(pair.first, openSockets, maxfds, true);
                     break;
@@ -587,7 +589,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 if ((ip.compare(pair.second->ip) == 0) && (port.compare(std::to_string(pair.second->port)) == 0))
                 {
-                    std::string response = send_message(pair.first, message);
+                    response = send_message(pair.first, message);
                     std::cout << response << std::endl;
                     closeClient(pair.first, openSockets, maxfds, true);
                     break;
@@ -597,7 +599,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("LISTSERVERS") == 0)
     {
-        std::string msg = "Servers connected to P3_group_1:\n";
+        msg = "Servers connected to P3_group_1:\n";
         int count = 1;
         for (auto const &pair : all_clients_servers)
         {
@@ -620,10 +622,10 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
 
             if (!requested_messages.empty())
             {
-                std::string request = requested_messages.front();
+                msg = requested_messages.front();
                 requested_messages.erase(requested_messages.begin());
                 stored_messages[group] = requested_messages;
-                std::string response = send_message(clientSocket, extract_msg_string(request, 3));
+                std::string response = send_message(clientSocket, extract_msg_string(msg, 3));
                 std::cout << response << std::endl;
             }
         }
@@ -631,7 +633,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (tokens[0].compare("SENDMSG") == 0)
     {
         std::string to_group = tokens[1];
-        std::string message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
+        message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
         std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
@@ -643,7 +645,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         std::string extracted_msg = extract_msg(buffer, 1);
         for (auto const &pair : all_clients_servers)
         {
-            std::string message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
+            message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
             std::cout << "message that we save:  " << message << std::endl;
             stored_messages[pair.second->name].push_back(message);
             int count = stored_messages[pair.second->name].size();
@@ -654,12 +656,12 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (tokens[0].compare("SENDREQ") == 0)
     {
         std::string to_group = tokens[1];
-        std::string message = "*STATUSREQ," + group_name + '#';
+        message = "*STATUSREQ," + group_name + '#';
         for (auto const &pair : all_clients_servers)
         {
             if (to_group.compare(pair.second->name) == 0)
             {
-                std::string response = send_message(pair.first, message);
+                response = send_message(pair.first, message);
                 std::cout << response << std::endl;
                 break;
             }
@@ -667,7 +669,9 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else
     {
-        std::cout << "Unknown command from client:" << tokens[0] << std::endl;
+        msg = "Unknown command from client:" + tokens[0];
+        send(clientSocket, msg.c_str(), msg.length(), 0);
+        std::cout << msg << std::endl;
     }
 }
 
@@ -719,7 +723,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
     else if (all_clients_servers[serverSocket]->verified)
     {
 
-        if (tokens[0].compare("CONNECTED") == 0)
+        if (tokens[0].compare("CONNECTED") == 0 &&(tokens.size()%3 == 1))
         {
             //if we have not still found the server address, we can access it now and send queryservice.
             if (server_addr.compare("0.0.0.0") == 0)
