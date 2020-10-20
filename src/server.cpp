@@ -499,7 +499,7 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
                 remove_from_server_connections(name);
             }
         }
-        sleep(60);
+        sleep(120);
     }
 }
 
@@ -640,7 +640,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("SENDALLMSG") == 0)
     {
-        std::string extracted_msg = extract_msg(buffer, 2);
+        std::string extracted_msg = extract_msg(buffer, 1);
         for (auto const &pair : all_clients_servers)
         {
             std::string message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
@@ -735,10 +735,6 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 send_connected(serverSocket, tokens[1]);
             }
             //if the server has the wrong name
-            if (all_clients_servers[serverSocket]->name.compare(tokens[1]) != 0)
-            {
-                all_clients_servers[serverSocket]->name = tokens[1];
-            }
             all_clients_servers[serverSocket]->port = atoi(tokens[3].c_str());
 
             std::map<std::string, Client_Server *> server_servers;
@@ -944,7 +940,7 @@ void send_keepalive()
                 send_message(pair.first, msg);
             }
         }
-        sleep(90);
+        sleep(180);
     }
 }
 
@@ -964,7 +960,7 @@ void send_queryservers()
             }
         }
         //we don't want to spamm this request, maybe every 10 min.
-        sleep(600);
+        sleep(1800);
     }
 }
 
@@ -1133,7 +1129,7 @@ int main(int argc, char *argv[])
                         {
                             // memset(buffer, 0, sizeof(buffer));
 
-                            printf("\033[1;32mFrom Whole buffer:\n \033[0m '%s'\n", buffer);
+                            // printf("\033[1;32mFrom Whole buffer:\n\033[0m'%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
                             char *p;
@@ -1197,7 +1193,7 @@ int main(int argc, char *argv[])
 
                                 std::vector<std::string> tokens = tokenize_command(long_req);
                                 std::cout << "\033[1;32mFrom " << std::to_string(client->sock) << " We recived : \033[0m" << std::endl;
-                                printf("'%s'\n", buffer);
+                                printf("'%s'\n", long_req);
                                 if (client->server)
                                 {
                                     // if the request is from a server we process it as a server command
