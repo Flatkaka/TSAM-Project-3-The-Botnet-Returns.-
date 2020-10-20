@@ -909,6 +909,7 @@ std::vector<std::string> tokenize_command(char *buffer)
         while (std::getline(ss, mini, ';'))
         {
             //remove whtiespace
+            
             mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
             tokens.push_back(mini);
         }
@@ -916,14 +917,26 @@ std::vector<std::string> tokenize_command(char *buffer)
 
     //check if the last letter is #
     char lastletter = token.back();
+    
+    
 
     if (lastletter == '#')
     {
 
+        token = tokens.back();
         tokens.pop_back();
+        
         token = token.substr(0, token.size() - 1);
         tokens.push_back(token);
+ 
     }
+
+
+    if (tokens.back().empty()){
+
+        tokens.pop_back();
+    }
+
 
     return tokens;
 }
