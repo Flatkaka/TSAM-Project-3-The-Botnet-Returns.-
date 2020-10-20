@@ -515,7 +515,7 @@ std::string extract_msg_string(std::string message, int max)
     while (std::getline(stream, token, ','))
     {
         
-        if(count ==1)
+        if(count ==2)
         {
             msg += "\033[1;33mFrom :" +token +"\n\033[0m";
         }
