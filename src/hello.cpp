@@ -21,6 +21,9 @@ std::string replace(std::string input, std::string from, std::string to)
 int main()
 {
 
-  std::cout < < < < std::endl;
+  std::string token ="#";
+  token = token.substr(0, token.size() - 1);
+  std::cout<<"ok"<<token<<"ok";
+  
   return 0;
 }
