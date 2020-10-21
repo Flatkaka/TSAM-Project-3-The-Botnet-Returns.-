@@ -169,8 +169,8 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-std::string server_addr = "0.0.0.0";
-//std::string server_addr = getIP();
+// std::string server_addr = "0.0.0.0";
+std::string server_addr = getIP();
 std::string port_addr;
 std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
@@ -352,17 +352,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
         server_count--;
     }
     close(socket);
-    // If this client's socket is maxfds then the next lowest
-    // one has to be determined. Socket fd's can be reused by the Kernel,
-    // so there aren't any nice ways to do this.
-
-    if(*maxfds == socket)
-     {
-        for(auto const& p : all_clients_servers)
-        {
-            *maxfds = std::max(*maxfds, p.second->sock);
-        }
-    }
+    
 
     // And remove from the list of open sockets.
     disconnectedClients.push_back(socket);
@@ -590,7 +580,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else if (tokens[0].compare("DISCONNECT") == 0)
     {
-        message = "*LEAVE#";
+
         if (tokens[1].compare("1") == 0)
         {
             std::string to_group = tokens[2];
@@ -599,8 +589,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 if (to_group.compare(pair.second->name) == 0)
                 {
-                    response = send_message(pair.first, message);
-                    std::cout << response << std::endl;
+
                     closeClient(pair.first, openSockets, maxfds, true);
                     break;
                 }
@@ -614,8 +603,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 if ((ip.compare(pair.second->ip) == 0) && (port.compare(std::to_string(pair.second->port)) == 0))
                 {
-                    response = send_message(pair.first, message);
-                    std::cout << response << std::endl;
+
                     closeClient(pair.first, openSockets, maxfds, true);
                     break;
                 }
@@ -1131,9 +1119,13 @@ int main(int argc, char *argv[])
         memset(bytestuffBuffer, 0, sizeof(bytestuffBuffer));
 
         // Look at sockets and see which ones have something to be read()
-
+        
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        std::cout<<"n: "<<n<<std::endl;
+        for (auto const &pair : all_clients_servers)
+        {
+            std::cout<<pair.first<<std::endl;
+        }
+        std::cout<<"max: "<<maxfds<<std::endl;
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -1302,9 +1294,29 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+                bool removed_max=false;
                 // Remove client from the clients list
-                for (auto const &c : disconnectedClients)
+                for (auto const &c : disconnectedClients){
                     all_clients_servers.erase(c);
+                    if (maxfds==c){
+                        std::cout<<"hello"<<std::endl;
+                        removed_max =true;
+                    }
+                }
+                
+                if (removed_max){
+                    // If this client's socket is maxfds then the next lowest
+                    // one has to be determined. Socket fd's can be reused by the Kernel,
+                    // so there aren't any nice ways to do this.
+                    std::cout<<"hello"<<std::endl;
+                    maxfds=4;
+                    for(auto const& p : all_clients_servers)
+                    {
+                        std::cout<<p.first<<std::endl;
+                        maxfds = std::max(maxfds, p.second->sock);
+                    }
+                }
+                
             }
         }
     }
