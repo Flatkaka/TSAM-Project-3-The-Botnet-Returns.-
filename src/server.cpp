@@ -1204,7 +1204,7 @@ int main(int argc, char *argv[])
                         {
                             // memset(buffer, 0, sizeof(buffer));
 
-                            printf("\033[1;32mFrom Whole buffer:\n\033[0m'%s'\n", buffer);
+                            // printf("\033[1;32mFrom Whole buffer:\n\033[0m'%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
                             char *p;
