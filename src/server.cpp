@@ -147,8 +147,8 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-// std::string server_addr = "0.0.0.0";
-std::string server_addr = getIP();
+std::string server_addr = "0.0.0.0";
+//std::string server_addr = getIP();
 std::string port_addr;
 std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
@@ -497,7 +497,7 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
             //remove all the servers that are not answearing, or that we have connected to from friends.
             for (std::string name : remove_servers)
             {
-                remove_from_server_connections(group_name);
+                remove_from_server_connections(name);
             }
         }
         sleep(60);
@@ -686,10 +686,10 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 if ((pair.second->name.compare(tokens[1]) == 0) && (pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0) && (pair.second->port == all_clients_servers[serverSocket]->port))
                 {
-                    std::cout<<pair.second->name<<tokens[1] <<std::endl;
-                    std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
-                    std::cout<<pair.second->port << all_clients_servers[serverSocket]->port<<std::endl;
-                    std::cout<<"Tryed to connect ot us again"<<tokens[1]<<std::endl;
+                    std::cout << pair.second->name << tokens[1] << std::endl;
+                    std::cout << pair.second->ip << all_clients_servers[serverSocket]->ip << std::endl;
+                    std::cout << pair.second->port << all_clients_servers[serverSocket]->port << std::endl;
+                    std::cout << "Tryed to connect ot us again" << tokens[1] << std::endl;
                     closeClient(serverSocket, openSockets, maxfds, true);
                     multiple = true;
                 }
