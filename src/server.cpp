@@ -431,6 +431,7 @@ void send_connected(int serverSocket, std::string name)
 {
     std::string msg = "*CONNECTED," + group_name + "," + server_addr + ',' + port_addr;
     std::set<std::vector<std::string>> all_servers;
+
     for (auto const &pair : all_clients_servers)
     {
         if (pair.second->server)
@@ -1240,9 +1241,10 @@ int main(int argc, char *argv[])
                 printf("\033[1;32mServer connected on server: %d \033[0m", serverSock);
             }
             // Now check for commands from all_clients_servers
-
+            std::cout<<"n "<<n<<std::endl;
             while (n-- > 0)
             {
+                std::cout<<"n "<<n<<std::endl;
                 pendingRequest = "";
                 for (auto const &pair : all_clients_servers)
                 {

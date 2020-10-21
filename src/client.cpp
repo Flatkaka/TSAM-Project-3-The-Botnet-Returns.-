@@ -51,7 +51,6 @@ void listenServer(int serverSocket, struct tm *timeinfo)
           std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We recived : \033[0m"<<std::endl;
           printf("%s\n", buffer);
        }
-       printf("here\n");
     }
 }
 
