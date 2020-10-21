@@ -1121,11 +1121,6 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
         
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        for (auto const &pair : all_clients_servers)
-        {
-            std::cout<<pair.first<<std::endl;
-        }
-        std::cout<<"max: "<<maxfds<<std::endl;
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -1190,8 +1185,6 @@ int main(int argc, char *argv[])
             while (n-- > 0)
             {
                 pendingRequest = "";
-                std::cout<<"n: "<<n<<std::endl;
-                int count =0;
                 for (auto const &pair : all_clients_servers)
                 {
                     // client can be both client and server, more conveniient to use same name
@@ -1270,8 +1263,6 @@ int main(int argc, char *argv[])
                             // if the whole message has been read
                             if (!pending)
                             {
-                                std::cout<<"count: "<<count<<std::endl;
-                                count+=1;
                                 char *long_req = new char[pendingRequest.length() + 1];
 
                                 strcpy(long_req, pendingRequest.c_str());
@@ -1299,7 +1290,7 @@ int main(int argc, char *argv[])
                 for (auto const &c : disconnectedClients){
                     all_clients_servers.erase(c);
                     if (maxfds==c){
-                        std::cout<<"hello"<<std::endl;
+
                         removed_max =true;
                     }
                 }
@@ -1308,11 +1299,10 @@ int main(int argc, char *argv[])
                     // If this client's socket is maxfds then the next lowest
                     // one has to be determined. Socket fd's can be reused by the Kernel,
                     // so there aren't any nice ways to do this.
-                    std::cout<<"hello"<<std::endl;
+
                     maxfds=4;
                     for(auto const& p : all_clients_servers)
                     {
-                        std::cout<<p.first<<std::endl;
                         maxfds = std::max(maxfds, p.second->sock);
                     }
                 }
