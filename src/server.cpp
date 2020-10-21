@@ -1062,7 +1062,6 @@ int main(int argc, char *argv[])
     char next;
     std::string pendingRequest; // if a message exeeds the buffer size, we store the message in this variable until the full message is read
     bool pending;               // this variable indicates whether there is some data in the pendingRequest variable
-    group_name += argv[1];
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
