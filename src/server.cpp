@@ -329,17 +329,14 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
 
         server_count--;
     }
-
+    close(socket);
     // If this client's socket is maxfds then the next lowest
     // one has to be determined. Socket fd's can be reused by the Kernel,
     // so there aren't any nice ways to do this.
 
-    if (*maxfds == socket)
-    {
-
-        *maxfds = 4;
-
-        for (auto const &p : all_clients_servers)
+    if(*maxfds == socket)
+     {
+        for(auto const& p : all_clients_servers)
         {
             *maxfds = std::max(*maxfds, p.second->sock);
         }
@@ -690,12 +687,13 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
     if ( (tokens[0].compare("QUERYSERVERS") == 0) && (tokens.size() == 2) )
     {
+
         bool multiple = false;
         if (!all_clients_servers[serverSocket]->verified)
         {
             for (auto const &pair : all_clients_servers)
             {
-                if ((pair.second->name.compare(tokens[1]) == 0) && (pair.second->ip.compare(all_clients_servers[serverSocket]->ip) == 0) && (pair.second->port == all_clients_servers[serverSocket]->port))
+                if (  (pair.second->name.compare(tokens[1]) == 0) && (pair.first != serverSocket) )
                 {
                     std::cout<<pair.second->name<<tokens[1] <<std::endl;
                     std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
@@ -706,8 +704,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 }
             }
         }
-        if (!multiple)
-        {   
+        if(!multiple){
             //if he has not been verifyed, we varify the server and set his name.
             if(!all_clients_servers[serverSocket]->verified){
                 all_clients_servers[serverSocket]->name = tokens[1];
@@ -736,57 +733,76 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
 
         if ( (tokens[0].compare("CONNECTED") == 0) && (tokens.size()%3 == 1) )
         {
-            //if we have not still found the server address, we can access it now and send queryservice.
-            if (server_addr.compare("0.0.0.0") == 0)
+            bool multiple = false;
+            if (!all_clients_servers[serverSocket]->verified)
             {
-                for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
-                {
-
-                    if (group_name.compare(tokens[(3 * i) + 1]) == 0)
-                    {
-                        server_addr = tokens[(3 * i) + 2];
-                    }
-                }
-                send_connected(serverSocket, tokens[1]);
-            }
-            //if the server has the wrong name
-            all_clients_servers[serverSocket]->port = atoi(tokens[3].c_str());
-
-            std::map<std::string, Client_Server *> server_servers;
-            bool skip = false;
-
-            //let's itterrate through all the servers that we were sent with the CONNECTED command.
-            for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
-            {
-                std::string name = tokens[(i * 3) + 1];
-                std::string port = tokens[(i * 3) + 3];
-                std::string address = tokens[(i * 3) + 2];
-                //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
                 for (auto const &pair : all_clients_servers)
                 {
-                    if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && std::to_string(pair.second->port).compare(port) == 0))
+                    if (  (pair.second->ip.compare(tokens[2]) == 0) && (pair.second->port == atoi(tokens[3].c_str())) && (pair.first != serverSocket) )
                     {
-                        skip = true;
-                        break;
+                        std::cout<<pair.second->name<<tokens[1] <<std::endl;
+                        std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
+                        std::cout<<pair.second->port << all_clients_servers[serverSocket]->port<<std::endl;
+                        std::cout<<"Tryed to connect ot us again"<<tokens[1]<<std::endl;
+                        closeClient(serverSocket, openSockets, maxfds, true);
+                        multiple = true;
                     }
                 }
-
-                //check if server has same name as this server, if it has it we are not intrested adding it to server_connections,
-                // if server has same address and  same port, we are not intrested adding it too.
-                //if server is skiped,(server is connected ), we are not interested adding it too
-                if (group_name.compare(name) != 0 && (!(server_addr.compare(address) == 0 && port_addr.compare(port) == 0)) && !skip)
-                {
-                    Client_Server *new_server = new Client_Server(serverSocket, true);
-                    std::string name = tokens[(i * 3) + 1];
-                    new_server->name = name;
-                    new_server->ip = tokens[(3 * i) + 2];
-                    new_server->port = atoi(tokens[(3 * i) + 3].c_str());
-                    server_servers[name] = new_server;
-                    std::cout << "server name: " << new_server->name << "is connected to" << serverSocket << std::endl;
-                }
-                skip = false;
             }
-            servers_connections[serverSocket] = server_servers;
+            if (!multiple)
+            {
+                //if we have not still found the server address, we can access it now and send queryservice.
+                if (server_addr.compare("0.0.0.0") == 0)
+                {
+                    for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
+                    {
+
+                        if (group_name.compare(tokens[(3 * i) + 1]) == 0)
+                        {
+                            server_addr = tokens[(3 * i) + 2];
+                        }
+                    }
+                    send_connected(serverSocket, tokens[1]);
+                }
+                //if the server has the wrong name
+                all_clients_servers[serverSocket]->port = atoi(tokens[3].c_str());
+
+                std::map<std::string, Client_Server *> server_servers;
+                bool skip = false;
+
+                //let's itterrate through all the servers that we were sent with the CONNECTED command.
+                for (int i = 1; i <= (((int)tokens.size() - 4) / 3); i++)
+                {
+                    std::string name = tokens[(i * 3) + 1];
+                    std::string port = tokens[(i * 3) + 3];
+                    std::string address = tokens[(i * 3) + 2];
+                    //let's check if we are also connected to him, if we are we don't add him to the map of the servers that are connected to the server who sent this.
+                    for (auto const &pair : all_clients_servers)
+                    {
+                        if ((pair.second->name.compare(name) == 0) || (pair.second->ip.compare(address) == 0 && std::to_string(pair.second->port).compare(port) == 0))
+                        {
+                            skip = true;
+                            break;
+                        }
+                    }
+
+                    //check if server has same name as this server, if it has it we are not intrested adding it to server_connections,
+                    // if server has same address and  same port, we are not intrested adding it too.
+                    //if server is skiped,(server is connected ), we are not interested adding it too
+                    if (group_name.compare(name) != 0 && (!(server_addr.compare(address) == 0 && port_addr.compare(port) == 0)) && !skip)
+                    {
+                        Client_Server *new_server = new Client_Server(serverSocket, true);
+                        std::string name = tokens[(i * 3) + 1];
+                        new_server->name = name;
+                        new_server->ip = tokens[(3 * i) + 2];
+                        new_server->port = atoi(tokens[(3 * i) + 3].c_str());
+                        server_servers[name] = new_server;
+                        std::cout << "server name: " << new_server->name << "is connected to" << serverSocket << std::endl;
+                    }
+                    skip = false;
+                }
+                servers_connections[serverSocket] = server_servers;
+            }
         }
         else if ( (tokens[0].compare("KEEPALIVE") == 0) && ( tokens.size() == 2) )
         {
@@ -1036,7 +1052,7 @@ int main(int argc, char *argv[])
     char next;
     std::string pendingRequest; // if a message exeeds the buffer size, we store the message in this variable until the full message is read
     bool pending;               // this variable indicates whether there is some data in the pendingRequest variable
-    // group_name+=argv[1];
+    group_name+=argv[1];
     if (argc != 2)
     {
         printf("Usage: chat_server <ip port>\n");
@@ -1095,7 +1111,7 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
 
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        
+        std::cout<<"n: "<<n<<std::endl;
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -1161,6 +1177,8 @@ int main(int argc, char *argv[])
             while (n-- > 0)
             {
                 pendingRequest = "";
+                std::cout<<"n: "<<n<<std::endl;
+                int count =0;
                 for (auto const &pair : all_clients_servers)
                 {
                     // client can be both client and server, more conveniient to use same name
@@ -1181,7 +1199,7 @@ int main(int argc, char *argv[])
                         {
                             // memset(buffer, 0, sizeof(buffer));
 
-                            // printf("\033[1;32mFrom Whole buffer:\n\033[0m'%s'\n", buffer);
+                            printf("\033[1;32mFrom Whole buffer:\n\033[0m'%s'\n", buffer);
                             off = 0;
                             foundHashtag = false;
                             char *p;
@@ -1239,6 +1257,8 @@ int main(int argc, char *argv[])
                             // if the whole message has been read
                             if (!pending)
                             {
+                                std::cout<<"count: "<<count<<std::endl;
+                                count+=1;
                                 char *long_req = new char[pendingRequest.length() + 1];
 
                                 strcpy(long_req, pendingRequest.c_str());
