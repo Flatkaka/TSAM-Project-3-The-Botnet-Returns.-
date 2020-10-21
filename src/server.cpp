@@ -640,7 +640,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     {
         std::string to_group = tokens[1];
         message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
-        std::cout << "message that we save:  " << message << std::endl;
         stored_messages[to_group].push_back(message);
         int count = stored_messages[to_group].size();
 
@@ -651,12 +650,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
         std::string extracted_msg = extract_msg(buffer, 1);
         for (auto const &pair : all_clients_servers)
         {
-            message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
-            std::cout << "message that we save:  " << message << std::endl;
-            stored_messages[pair.second->name].push_back(message);
-            int count = stored_messages[pair.second->name].size();
 
-            find_server_to_send_MSG(pair.second->name, count, message);
+            if (pair.second->server && pair.second->name.empty() == false)
+            {
+                message = "*SEND_MSG," + pair.second->name + "," + group_name + "," + extracted_msg + "#";
+                stored_messages[pair.second->name].push_back(message);
+                int count = stored_messages[pair.second->name].size();
+
+                find_server_to_send_MSG(pair.second->name, count, message);
+            }
         }
     }
     else if (tokens[0].compare("SENDREQ") == 0)
@@ -1155,9 +1157,10 @@ int main(int argc, char *argv[])
             }
             // Now check for commands from all_clients_servers
 
-            pendingRequest = "";
+            
             while (n-- > 0)
             {
+                pendingRequest = "";
                 for (auto const &pair : all_clients_servers)
                 {
                     // client can be both client and server, more conveniient to use same name
