@@ -946,9 +946,11 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
-
+     std::cout<<buffer<<std::endl;
+    std::string buf = replace((std::string) buffer,";,","; ,");
     // Split command from client into tokens for parsing
-    std::stringstream stream(buffer);
+    std::stringstream stream(buf.c_str());
+    std::cout<<buf<<std::endl;
     int count = 0;
     while (std::getline(stream, token, ','))
     {
@@ -963,14 +965,14 @@ std::vector<std::string> tokenize_command(char *buffer)
             }
         }
 
-        token.erase(std::remove_if(token.begin(), token.end(), ::isspace), token.end());
 
         std::stringstream ss(token);
         while (std::getline(ss, mini, ';'))
         {
             //remove whtiespace
-
+            std::cout<<mini<<std::endl;
             mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
+            std::cout<<mini<<std::endl;
             tokens.push_back(mini);
         }
     }
@@ -1060,8 +1062,6 @@ int main(int argc, char *argv[])
     bool pending;               // this variable indicates whether there is some data in the pendingRequest variable
     time_t time1;
     time_t time2;
-    time_t time3;
-    time_t time4;
 
 
 
@@ -1124,20 +1124,7 @@ int main(int argc, char *argv[])
         memset(bytestuffBuffer, 0, sizeof(bytestuffBuffer));
 
         // Look at sockets and see which ones have something to be read()
-        time(&time3);
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        
-        time(&time4);
-        if (difftime(time4,time3)<1){
-            count+=1;
-        }
-        else{
-            count = 0;
-        }
-        if (count>5){
-            std::cout<<"sleep"<<std::endl;
-            sleep(10);
-        }
         std::cout<<"n: "<<n<<std::endl;
         for (auto const &pair : all_clients_servers)
         {
