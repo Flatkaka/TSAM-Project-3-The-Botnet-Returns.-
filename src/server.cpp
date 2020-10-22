@@ -356,9 +356,9 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
     // one has to be determined. Socket fd's can be reused by the Kernel,
     // so there aren't any nice ways to do this.
 
-    if(*maxfds == socket)
-     {
-        for(auto const& p : all_clients_servers)
+    if (*maxfds == socket)
+    {
+        for (auto const &p : all_clients_servers)
         {
             *maxfds = std::max(*maxfds, p.second->sock);
         }
@@ -715,7 +715,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         {
             for (auto const &pair : all_clients_servers)
             {
-                if (  (pair.second->name.compare(tokens[1]) == 0) && (pair.first != serverSocket) )
+                if ((pair.second->name.compare(tokens[1]) == 0) && (pair.first != serverSocket))
                 {
                     std::cout << pair.second->name << tokens[1] << std::endl;
                     std::cout << pair.second->ip << all_clients_servers[serverSocket]->ip << std::endl;
@@ -762,12 +762,12 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 for (auto const &pair : all_clients_servers)
                 {
-                    if (  (pair.second->ip.compare(tokens[2]) == 0) && (pair.second->port == atoi(tokens[3].c_str())) && (pair.first != serverSocket) )
+                    if ((pair.second->ip.compare(tokens[2]) == 0) && (pair.second->port == atoi(tokens[3].c_str())) && (pair.first != serverSocket))
                     {
-                        std::cout<<pair.second->name<<tokens[1] <<std::endl;
-                        std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
-                        std::cout<<pair.second->port << all_clients_servers[serverSocket]->port<<std::endl;
-                        std::cout<<"Tryed to connect ot us again"<<tokens[1]<<std::endl;
+                        std::cout << pair.second->name << tokens[1] << std::endl;
+                        std::cout << pair.second->ip << all_clients_servers[serverSocket]->ip << std::endl;
+                        std::cout << pair.second->port << all_clients_servers[serverSocket]->port << std::endl;
+                        std::cout << "Tryed to connect ot us again" << tokens[1] << std::endl;
                         closeClient(serverSocket, openSockets, maxfds, true);
                         multiple = true;
                     }
@@ -1133,7 +1133,7 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
 
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        std::cout<<"n: "<<n<<std::endl;
+        std::cout << "n: " << n << std::endl;
         if (n < 0)
         {
             perror("select failed - closing down\n");
@@ -1198,8 +1198,8 @@ int main(int argc, char *argv[])
             while (n-- > 0)
             {
                 pendingRequest = "";
-                std::cout<<"n: "<<n<<std::endl;
-                int count =0;
+                std::cout << "n: " << n << std::endl;
+                int count = 0;
                 for (auto const &pair : all_clients_servers)
                 {
                     // client can be both client and server, more conveniient to use same name
@@ -1278,8 +1278,8 @@ int main(int argc, char *argv[])
                             // if the whole message has been read
                             if (!pending)
                             {
-                                std::cout<<"count: "<<count<<std::endl;
-                                count+=1;
+                                std::cout << "count: " << count << std::endl;
+                                count += 1;
                                 char *long_req = new char[pendingRequest.length() + 1];
 
                                 strcpy(long_req, pendingRequest.c_str());
