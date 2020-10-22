@@ -5,13 +5,13 @@
 
 std::string replace(std::string input, std::string from, std::string to)
 {
-  std::cout << from << std::endl;
-  std::cout << to << std::endl;
   size_t pos = 0;
   pos = input.find(from.c_str(), pos);
   while (pos != std::string::npos)
   {
-    input.replace(pos, sizeof(to.c_str()), to.c_str());
+    std::string empty = "";
+    input.replace(pos, 1, empty.c_str());
+    input.insert(pos, to.c_str(), sizeof(to.c_str()));
     pos += sizeof(to.c_str());
     pos = input.find(from.c_str(), pos);
   }
@@ -21,9 +21,8 @@ std::string replace(std::string input, std::string from, std::string to)
 int main()
 {
 
-  std::string token ="#";
-  token = token.substr(0, token.size() - 1);
-  std::cout<<"ok"<<token<<"ok";
-  
+  std::string msg = "hello, ba$by, trhis is amzaing!!";
+  std::cout << replace(msg, "$", "hilmar") << std::endl;
+
   return 0;
 }
