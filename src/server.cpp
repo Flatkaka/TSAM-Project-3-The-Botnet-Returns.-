@@ -1122,11 +1122,6 @@ int main(int argc, char *argv[])
 
         // Look at sockets and see which ones have something to be read()
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-        std::cout<<"n: "<<n<<std::endl;
-        for (auto const &pair : all_clients_servers)
-        {
-            std::cout << pair.first << std::endl;
-        }
 
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
