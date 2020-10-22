@@ -944,10 +944,13 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
-    //  std::cout<<buffer<<std::endl;
-    // std::string buf = replace((std::string) buffer,";,","; ,");
+    std::string buf = replace((std::string) buffer,";,","; ,");
+    buf = replace((std::string) buf,",,",", ,");
+    buf = replace((std::string) buf,",;",",;");
     // Split command from client into tokens for parsing
-    std::stringstream stream(buffer);
+    std::stringstream stream(buf.c_str());
+
+
 
     int count = 0;
     while (std::getline(stream, token, ','))
@@ -968,9 +971,7 @@ std::vector<std::string> tokenize_command(char *buffer)
         while (std::getline(ss, mini, ';'))
         {
             //remove whtiespace
-            // std::cout<<mini<<std::endl;
             mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
-            // std::cout<<mini<<std::endl;
             tokens.push_back(mini);
         }
     }
