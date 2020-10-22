@@ -178,7 +178,6 @@ int server_count;                      // number of servers connected
 std::list<int> disconnectedClients;
 
 // Open socket for specified port.
-
 //
 // Returns -1 if unable to create the socket for any reason.
 
@@ -255,7 +254,9 @@ std::string replace(std::string input, std::string from, std::string to)
     pos = input.find(from.c_str(), pos);
     while (pos != std::string::npos)
     {
-        input.replace(pos, sizeof(to.c_str()), to.c_str());
+        std::string empty = "";
+        input.replace(pos, 1, empty.c_str());
+        input.insert(pos, to.c_str(), sizeof(to.c_str()));
         pos += sizeof(to.c_str());
         pos = input.find(from.c_str(), pos);
     }
@@ -353,7 +354,6 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
         server_count--;
     }
     close(socket);
-    
 
     // And remove from the list of open sockets.
     disconnectedClients.push_back(socket);
@@ -462,7 +462,6 @@ void send_connected(int serverSocket, std::string name)
     send_message(serverSocket, msg);
 }
 
-
 void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
 {
     if (server_count < 10)
@@ -505,7 +504,6 @@ void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
             remove_from_server_connections(name);
         }
     }
-
 }
 
 std::string extract_msg_string(std::string message, int max)
@@ -699,7 +697,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
         {
             for (auto const &pair : all_clients_servers)
             {
-                if (  (pair.second->name.compare(tokens[1]) == 0) && (pair.first != serverSocket) )
+                if ((pair.second->name.compare(tokens[1]) == 0) && (pair.first != serverSocket))
                 {
                     std::cout << pair.second->name << tokens[1] << std::endl;
                     std::cout << pair.second->ip << all_clients_servers[serverSocket]->ip << std::endl;
@@ -746,12 +744,12 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
             {
                 for (auto const &pair : all_clients_servers)
                 {
-                    if (  (pair.second->ip.compare(tokens[2]) == 0) && (pair.second->port == atoi(tokens[3].c_str())) && (pair.first != serverSocket) )
+                    if ((pair.second->ip.compare(tokens[2]) == 0) && (pair.second->port == atoi(tokens[3].c_str())) && (pair.first != serverSocket))
                     {
-                        std::cout<<pair.second->name<<tokens[1] <<std::endl;
-                        std::cout<< pair.second->ip<<all_clients_servers[serverSocket]->ip<<std::endl; 
-                        std::cout<<pair.second->port << all_clients_servers[serverSocket]->port<<std::endl;
-                        std::cout<<"Tryed to connect ot us again"<<tokens[1]<<std::endl;
+                        std::cout << pair.second->name << tokens[1] << std::endl;
+                        std::cout << pair.second->ip << all_clients_servers[serverSocket]->ip << std::endl;
+                        std::cout << pair.second->port << all_clients_servers[serverSocket]->port << std::endl;
+                        std::cout << "Tryed to connect ot us again" << tokens[1] << std::endl;
                         closeClient(serverSocket, openSockets, maxfds, true);
                         multiple = true;
                     }
@@ -946,11 +944,11 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
-     std::cout<<buffer<<std::endl;
-    std::string buf = replace((std::string) buffer,";,","; ,");
+    //  std::cout<<buffer<<std::endl;
+    // std::string buf = replace((std::string) buffer,";,","; ,");
     // Split command from client into tokens for parsing
-    std::stringstream stream(buf.c_str());
-    std::cout<<buf<<std::endl;
+    std::stringstream stream(buffer);
+
     int count = 0;
     while (std::getline(stream, token, ','))
     {
@@ -970,9 +968,9 @@ std::vector<std::string> tokenize_command(char *buffer)
         while (std::getline(ss, mini, ';'))
         {
             //remove whtiespace
-            std::cout<<mini<<std::endl;
+            // std::cout<<mini<<std::endl;
             mini.erase(std::remove_if(mini.begin(), mini.end(), ::isspace), mini.end());
-            std::cout<<mini<<std::endl;
+            // std::cout<<mini<<std::endl;
             tokens.push_back(mini);
         }
     }
@@ -1113,8 +1111,6 @@ int main(int argc, char *argv[])
     finished = false;
     time(&time1);
 
-    int count =0;
-    
     while (!finished)
     {
 
@@ -1128,12 +1124,13 @@ int main(int argc, char *argv[])
         std::cout<<"n: "<<n<<std::endl;
         for (auto const &pair : all_clients_servers)
         {
-            std::cout<<pair.first<<std::endl;
+            std::cout << pair.first << std::endl;
         }
-        
+
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
-        if (difftime(time2,time1)>180){
+        if (difftime(time2, time1) > 180)
+        {
 
             connect_to_server_in_servers_connections(&openSockets, &maxfds);
             time(&time1);
@@ -1145,7 +1142,6 @@ int main(int argc, char *argv[])
         }
         else
         {
-
             // First, accept  any new client connections to the server on the client listening socket
             if (FD_ISSET(clientListenSock, &readSockets))
             {
@@ -1243,7 +1239,6 @@ int main(int argc, char *argv[])
                                 // bytestuffing...
                                 if (p == NULL)
                                 {
-
                                     pending = true;
                                     foundHashtag = true;
                                 }
@@ -1291,7 +1286,6 @@ int main(int argc, char *argv[])
                                 if (client->server)
                                 {
                                     // if the request is from a server we process it as a server command
-
                                     serverCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
                                 else
@@ -1299,38 +1293,35 @@ int main(int argc, char *argv[])
                                     // if the request is from a client we process it as a client command
                                     clientCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
-                                for (auto const &pair : all_clients_servers)
-                                {
-                                    std::cout<<pair.first<<std::endl;
-                                }
                                 break;
                             }
                         }
                     }
                 }
-                bool removed_max=false;
+                bool removed_max = false;
                 // Remove client from the clients list
-                for (auto const &c : disconnectedClients){
-                    std::cout<<c<<std::endl;
+                for (auto const &c : disconnectedClients)
+                {
                     all_clients_servers.erase(c);
-                    if (maxfds==c){
-
-                        removed_max =true;
+                    if (maxfds == c)
+                    {
+                        removed_max = true;
                     }
                 }
-                
-                if (removed_max){
+
+                if (removed_max)
+                {
                     // If this client's socket is maxfds then the next lowest
                     // one has to be determined. Socket fd's can be reused by the Kernel,
                     // so there aren't any nice ways to do this.
 
-                    maxfds=4;
-                    for(auto const& p : all_clients_servers)
+                    maxfds = 4;
+                    for (auto const &p : all_clients_servers)
                     {
                         maxfds = std::max(maxfds, p.second->sock);
                     }
                 }
-                
+                break;
             }
         }
     }

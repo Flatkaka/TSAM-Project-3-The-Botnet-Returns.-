@@ -38,19 +38,19 @@ void listenServer(int serverSocket, struct tm *timeinfo)
 
     while (true)
     {
-       memset(buffer, 0, sizeof(buffer));
-       nread = read(serverSocket, buffer, sizeof(buffer));
+        memset(buffer, 0, sizeof(buffer));
+        nread = read(serverSocket, buffer, sizeof(buffer));
 
-       if(nread == 0)                      // Server has dropped us
-       {
-          printf("Over and Out\n");
-          exit(0);
-       }
-       else if(nread > 0)
-       {
-          std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We recived : \033[0m"<<std::endl;
-          printf("%s\n", buffer);
-       }
+        if (nread == 0) // Server has dropped us
+        {
+            printf("Over and Out\n");
+            exit(0);
+        }
+        else if (nread > 0)
+        {
+            std::cout << "\033[1;32mAt " << asctime(timeinfo) << "We recived : \033[0m" << std::endl;
+            printf("%s\n", buffer);
+        }
     }
 }
 
@@ -60,7 +60,9 @@ std::string replace(std::string input, std::string from, std::string to)
     pos = input.find(from.c_str(), pos);
     while (pos != std::string::npos)
     {
-        input.replace(pos, sizeof(to.c_str()), to.c_str());
+        std::string empty = "";
+        input.replace(pos, 1, empty.c_str());
+        input.insert(pos, to.c_str(), sizeof(to.c_str()));
         pos += sizeof(to.c_str());
         pos = input.find(from.c_str(), pos);
     }
@@ -149,14 +151,13 @@ int main(int argc, char *argv[])
             getline(std::cin, args_from_user);
         }
 
-        args_from_user.substr(0, args_from_user.size()-1);
+        args_from_user.substr(0, args_from_user.size() - 1);
         args_from_user = replace(args_from_user, "*", "**");
         args_from_user = replace(args_from_user, "#", "##");
-        args_from_user="*"+args_from_user+"#";
-        std::cout<<"\033[1;32mAt "<< asctime(timeinfo) <<"We sent : \033[0m"<<std::endl;
+        args_from_user = "*" + args_from_user + "#";
+        std::cout << "\033[1;32mAt " << asctime(timeinfo) << "We sent : \033[0m" << std::endl;
         printf("%s\n", args_from_user.c_str());
         strcpy(buffer, args_from_user.c_str());
-
 
         nwrite = send(serverSocket, args_from_user.c_str(), args_from_user.length(), 0);
 
