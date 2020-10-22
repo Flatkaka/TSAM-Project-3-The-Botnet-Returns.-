@@ -462,58 +462,6 @@ void send_connected(int serverSocket, std::string name)
     send_message(serverSocket, msg);
 }
 
-//connect to servers that the servers that we are connected are connected to.
-// void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
-// {
-
-//     // run through all of the servers we are connect
-//     while (true)
-//     {
-
-//         if (server_count < 10)
-//         {
-//             bool sent = false;
-//             std::vector<std::string> remove_servers;
-//             for (auto const &pair : servers_connections)
-//             {
-//                 //run through each server that the servers we are connected to see what server they are connected
-//                 for (auto const &pair2 : pair.second)
-//                 {
-//                     //change string to char.
-//                     std::string ip = pair2.second->ip;
-//                     std::string port_str = std::to_string(pair2.second->port);
-//                     char *server_address = new char[ip.length() + 1];
-//                     strcpy(server_address, ip.c_str());
-//                     char *port = new char[port_str.length() + 1];
-//                     strcpy(port, port_str.c_str());
-//                     std::cout << "Ip and port for group " << pair2.first << " are " << ip << " " << port_str << std::endl;
-//                     //try to connect that server that we are not connected to.
-//                     if (connect_to_server(server_address, port, openSockets, maxfds) > 0)
-//                     {
-//                         //remove that server which we connected to from the map og maps so we  won't try to connect to it again.
-
-//                         std::cout << "Sending to server through friends: " << pair2.first << std::endl;
-//                         std::cout << "Removed in:" << pair.first << std::endl;
-//                         sent = true;
-//                     }
-//                     remove_servers.push_back(pair2.first);
-
-//                     if (sent)
-//                         break;
-//                 }
-//                 if (sent)
-//                     break;
-//             }
-//             //remove all the servers that are not answearing, or that we have connected to from friends.
-//             for (std::string name : remove_servers)
-//             {
-//                 remove_from_server_connections(name);
-//             }
-//         }
-//         sleep(120);
-//     }
-// }
-
 void connect_to_server_in_servers_connections(fd_set *openSockets, int *maxfds)
 {
     if (server_count < 10)
@@ -1110,7 +1058,6 @@ int main(int argc, char *argv[])
     bool pending;               // this variable indicates whether there is some data in the pendingRequest variable
     time_t time1;
     time_t time2;
-    group_name += argv[1];
 
     if (argc != 2)
     {
@@ -1159,6 +1106,7 @@ int main(int argc, char *argv[])
 
     finished = false;
     time(&time1);
+
     while (!finished)
     {
 
@@ -1170,6 +1118,12 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
 
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
+
+        std::cout << "n: " << n << std::endl;
+        for (auto const &pair : all_clients_servers)
+        {
+            std::cout << pair.first << std::endl;
+        }
 
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
@@ -1238,11 +1192,10 @@ int main(int argc, char *argv[])
                 printf("\033[1;32mServer connected on server: %d \033[0m", serverSock);
             }
             // Now check for commands from all_clients_servers
-            std::cout << "n " << n << std::endl;
             disconnectedClients.clear();
             while (n-- > 0)
             {
-                std::cout << "n " << n << std::endl;
+
                 pendingRequest = "";
                 for (auto const &pair : all_clients_servers)
                 {
@@ -1338,6 +1291,11 @@ int main(int argc, char *argv[])
                                     // if the request is from a client we process it as a client command
                                     clientCommand(client->sock, &openSockets, &maxfds, tokens, long_req);
                                 }
+                                for (auto const &pair : all_clients_servers)
+                                {
+                                    std::cout << pair.first << std::endl;
+                                }
+                                break;
                             }
                         }
                     }
