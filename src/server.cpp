@@ -254,10 +254,10 @@ std::string replace(std::string input, std::string from, std::string to)
     pos = input.find(from.c_str(), pos);
     while (pos != std::string::npos)
     {
-        std::string empty = "";
-        input.replace(pos, 1, empty.c_str());
-        input.insert(pos, to.c_str(), sizeof(to.c_str()));
-        pos += sizeof(to.c_str());
+        std::string front = input.substr(0, pos) + to.c_str();
+        std::string back = input.substr(pos + from.length());
+        input = front + back;
+        pos += to.length();
         pos = input.find(from.c_str(), pos);
     }
     return input;
