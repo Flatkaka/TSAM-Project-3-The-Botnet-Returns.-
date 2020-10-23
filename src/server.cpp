@@ -145,6 +145,7 @@ public:
     bool server;      // true if connection is from another server
     bool verified;
     bool sent;
+    int strike =0;
 
     Client_Server(int socket, bool is_server)
     {
@@ -678,9 +679,17 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     }
     else
     {
-        msg = "Unknown command from client:" + tokens[0];
-        send(clientSocket, msg.c_str(), msg.length(), 0);
-        std::cout << msg << std::endl;
+        all_clients_servers[clientSocket]->strike+=1;
+        if (all_clients_servers[clientSocket]->strike<3){
+            msg = "Unknown command from client:" + tokens[0];
+            send(clientSocket, msg.c_str(), msg.length(), 0);
+            std::cout << msg << std::endl;
+        }
+        else{
+            msg = "Too many error as a client:" + tokens[0];
+            send(clientSocket, msg.c_str(), msg.length(), 0);
+            closeClient(clientSocket, openSockets, maxfds, true);
+        }
     }
 }
 
@@ -876,7 +885,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 std::string group = pair.first;
                 int message_count = pair.second.size();
                 //if they are not empty we add thir name and the amount to the response.
-                if (!group.empty())
+                if (!group.empty() && (group.compare(group_name)!=0) )
                 {
                     message += ',' + group + ',' + std::to_string(message_count);
                 }
@@ -1122,6 +1131,7 @@ int main(int argc, char *argv[])
 
         // Look at sockets and see which ones have something to be read()
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
+
 
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
