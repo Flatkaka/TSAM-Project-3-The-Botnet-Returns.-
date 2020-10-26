@@ -239,6 +239,7 @@ int open_socket(int portno)
 
 std::string send_message(int socket, std::string req)
 {
+    std::cout << "\033[1;33mWe send to " << all_clients_servers[socket]->name << " number:" << socket << ": \033[0m" << std::endl;
     int nwrite = send(socket, req.c_str(), req.length(), 0);
     std::cout << "\033[1;33mWe send to " << all_clients_servers[socket]->name << " number:" << socket << ": \033[0m" << std::endl;
     std::cout << req << std::endl;
@@ -350,7 +351,7 @@ void closeClient(int socket, fd_set *openSockets, int *maxfds, bool server)
     std::cout << "\033[1;31mServer " << all_clients_servers[socket]->name << " left.\033[0m" << std::endl;
     if (server)
     {
-        // Remove client from all the map.
+        // Remove server from all the map.
         servers_connections.erase(socket);
 
         server_count--;
@@ -439,7 +440,6 @@ void send_connected(int serverSocket, std::string name)
 {
     std::string msg = "*CONNECTED," + group_name + "," + server_addr + ',' + port_addr;
     std::set<std::vector<std::string>> all_servers;
-
     //first find all the servers we are connected too.
     for (auto const &pair : all_clients_servers)
     {
@@ -470,6 +470,7 @@ void send_connected(int serverSocket, std::string name)
         }
     }
     msg += "#";
+
     send_message(serverSocket, msg);
 }
 
@@ -1159,6 +1160,9 @@ int main(int argc, char *argv[])
         // Look at sockets and see which ones have something to be read()
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
 
+ 
+        std::cout<<server_count<<std::endl;
+        
 
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
@@ -1197,7 +1201,7 @@ int main(int argc, char *argv[])
                 printf("\033[1;32mClient connected on server: %d \033[0m\n", clientSock);
             }
             // Next, accept  any new server connections to the server on the server listening socket
-            if (FD_ISSET(serverListenSock, &readSockets) && (server_count < 16))
+            if (FD_ISSET(serverListenSock, &readSockets) && (!(server_count>15) ))
             {
                 serverSock = accept(serverListenSock, (struct sockaddr *)&new_connection,
                                     &connectionLen);
@@ -1215,7 +1219,6 @@ int main(int argc, char *argv[])
                 // create a new client to store information.
                 Client_Server *new_server = new Client_Server(serverSock, true);
                 new_server->ip = ip_str;
-                std::cout << ip_str << std::endl;
                 new_server->port = -1;
                 all_clients_servers[serverSock] = new_server;
 
@@ -1225,8 +1228,9 @@ int main(int argc, char *argv[])
                 // Decrement the number of sockets waiting to be dealt with
                 n--;
 
-                printf("\033[1;32mServer connected on server: %d \033[0m", serverSock);
+                printf("\033[1;32mServer connected on number: %d \033[0m", serverSock);
             }
+        
             // Now check for commands from all_clients_servers
             disconnectedClients.clear();
             while (n-- > 0)
