@@ -1,5 +1,4 @@
 .vscode
-src/Makefile
 src/client
 src/server
 ip.cpp
