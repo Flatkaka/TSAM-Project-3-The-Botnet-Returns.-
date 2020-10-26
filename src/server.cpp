@@ -145,7 +145,7 @@ public:
     bool server;      // true if connection is from another server
     bool verified;
     bool sent;
-    int strike =0;
+    int strike = 0;
 
     Client_Server(int socket, bool is_server)
     {
@@ -171,8 +171,8 @@ public:
 std::map<std::string, std::vector<std::string>> stored_messages;
 std::map<int, Client_Server *> all_clients_servers;                        // Lookup table for per Client_Server information
 std::map<int, std::map<std::string, Client_Server *>> servers_connections; //lookuptable to see what server are connected to the servers our server is connect.
-// std::string server_addr = "0.0.0.0";
-std::string server_addr = getIP();
+
+std::string server_addr = "0.0.0.0";
 std::string port_addr;
 std::string group_name = "P3_GROUP_1"; // global variable storing the name of our group
 int server_count;                      // number of servers connected
@@ -239,7 +239,6 @@ int open_socket(int portno)
 
 std::string send_message(int socket, std::string req)
 {
-    std::cout << "\033[1;33mWe send to " << all_clients_servers[socket]->name << " number:" << socket << ": \033[0m" << std::endl;
     int nwrite = send(socket, req.c_str(), req.length(), 0);
     std::cout << "\033[1;33mWe send to " << all_clients_servers[socket]->name << " number:" << socket << ": \033[0m" << std::endl;
     std::cout << req << std::endl;
@@ -389,7 +388,7 @@ int find_server_to_send_MSG(std::string to_group, int count, std::string msg)
         for (auto const &pair2 : pair.second)
         {
             Client_Server *client = pair2.second;
-            
+
             // if the name match we send him a keepalive.
             if (client->name.compare(to_group) == 0)
             {
@@ -561,7 +560,7 @@ std::string extract_msg(char *buffer, int max)
     //loop throught the stream and through away the cammand before.
     while (std::getline(stream, token, ','))
     {
-    
+
         if (count >= max)
         {
 
@@ -670,7 +669,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     //if client send a command that is SENDMSG, we go into this clause.
     else if (tokens[0].compare("SENDMSG") == 0)
     {
-        
+
         std::string to_group = tokens[1];
         message = "*SEND_MSG," + to_group + "," + group_name + "," + extract_msg(buffer, 2) + "#";
         stored_messages[to_group].push_back(message);
@@ -716,13 +715,15 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds, std::vect
     else
     {
         //if client sends invalid command it comes here. if client send to many valid commands we disconnect him.
-        all_clients_servers[clientSocket]->strike+=1;
-        if (all_clients_servers[clientSocket]->strike<3){
+        all_clients_servers[clientSocket]->strike += 1;
+        if (all_clients_servers[clientSocket]->strike < 3)
+        {
             msg = "Unknown command from client:" + tokens[0];
             send(clientSocket, msg.c_str(), msg.length(), 0);
             std::cout << msg << std::endl;
         }
-        else{
+        else
+        {
             msg = "Too many error as a client:" + tokens[0];
             send(clientSocket, msg.c_str(), msg.length(), 0);
             closeClient(clientSocket, openSockets, maxfds, true);
@@ -840,12 +841,11 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 skip = false;
             }
             servers_connections[serverSocket] = server_servers;
-            
         }
         //if the  command is KEEPALIVE it gose into theis if clouse, has to beof the right size.
         else if ((tokens[0].compare("KEEPALIVE") == 0) && (tokens.size() == 2))
         {
-            
+
             int message_count = atoi(tokens[1].c_str());
             //if keepalive has number larger then 0 they have a msg for us.
             if (message_count > 0)
@@ -911,7 +911,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds, std::vect
                 std::string group = pair.first;
                 int message_count = pair.second.size();
                 //if they are not empty we add thir name and the amount to the response.
-                if (!group.empty() && (group.compare(group_name)!=0) )
+                if (!group.empty() && (group.compare(group_name) != 0))
                 {
                     message += ',' + group + ',' + std::to_string(message_count);
                 }
@@ -981,13 +981,11 @@ std::vector<std::string> tokenize_command(char *buffer)
     std::vector<std::string> tokens;
     std::string token;
     std::string mini;
-    std::string buf = replace((std::string) buffer,";,","; ,");
-    buf = replace((std::string) buf,",,",", ,");
-    buf = replace((std::string) buf,",;",",;");
+    std::string buf = replace((std::string)buffer, ";,", "; ,");
+    buf = replace((std::string)buf, ",,", ", ,");
+    buf = replace((std::string)buf, ",;", ",;");
     // Split command from client into tokens for parsing
     std::stringstream stream(buf.c_str());
-
-
 
     int count = 0;
     while (std::getline(stream, token, ','))
@@ -1002,7 +1000,6 @@ std::vector<std::string> tokenize_command(char *buffer)
                 ;
             }
         }
-
 
         std::stringstream ss(token);
         while (std::getline(ss, mini, ';'))
@@ -1099,12 +1096,15 @@ int main(int argc, char *argv[])
     time_t time1;
     time_t time2;
 
-
-
-    if (argc != 2)
+    if (argc != 3)
     {
-        printf("Usage: chat_server <ip port>\n");
+        printf("Usage: chat_server <ip port> <skel/home>\n");
         exit(0);
+    }
+
+    if (atoi(argv[2]) == 0)
+    {
+        server_addr = getIP();
     }
 
     // Setup client socket for server to listen to
@@ -1159,10 +1159,6 @@ int main(int argc, char *argv[])
 
         // Look at sockets and see which ones have something to be read()
         int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
-
- 
-        std::cout<<server_count<<std::endl;
-        
 
         //check if the time has been moer then 180 s since we last send a new req.
         time(&time2);
